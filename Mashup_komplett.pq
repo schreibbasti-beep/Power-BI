@@ -86,32 +86,31 @@ in
     Typen;
 
 shared Qualifikations_Status = let
-    BaseUrl = "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
-        & "/_api/Web/Lists/GetByTitle('Qualifikations_Status')/Items",
-
-    // Kein $select – Gültig_ab wird im $select nicht akzeptiert (interner Name ≠ OData-Name)
-    // Spaltenfilterung erfolgt komplett in Power Query
-    Quelle = OData.Feed(
-        BaseUrl & "?$top=5000",
-        null,
-        [Implementation = "2.0"]
+    // SharePoint.Tables statt OData.Feed – vermeidet Auth-Probleme ("Unerwarteter Dokumenttyp")
+    // und nutzt Anzeigenamen (Gültig_ab funktioniert direkt)
+    Quelle = SharePoint.Tables(
+        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
+        [ApiVersion = 15]
     ),
+    Raw = Quelle{[Title="Qualifikations_Status"]}[Items],
 
-    // Navigations-/Lookup-Expansionen abfangen
     OhneErrors = Table.ReplaceErrorValues(
-        Quelle,
-        List.Transform(Table.ColumnNames(Quelle), each {_, null})
+        Raw,
+        List.Transform(Table.ColumnNames(Raw), each {_, null})
     ),
 
-    // Exakte Spaltennamen laut OData-Response (verifiziert via Diagnose-Abfrage)
+    // Lookup-IDs erscheinen in SharePoint.Tables als "FeldName: ID"
+    // Mehrere Kandidaten angegeben – nur vorhandene werden übernommen
     GewuenschteSpalten = {
         "ID",
-        "Auditor_LookupId",
-        "Qualifikation0Id",
+        "Auditor_Lookup: ID",       // Lookup-ID für Auditor
+        "Qualifikation0: ID",       // Lookup-ID für Qualifikation
+        "Qualifikation0Id",         // Fallback (falls direkt vorhanden)
         "Status",
         "Gültig_ab",
         "Gültig_bis",
-        "approval_lookup_idId",
+        "approval_lookup_id: ID",   // Lookup-ID für Approval
+        "approval_lookup_idId",     // Fallback
         "Datum_Erstberufung_Assistant_Tra",
         "Datum_Erstberufung_Co_Auditor",
         "Datum_Erstberufung_Lead_Auditor",
@@ -127,8 +126,11 @@ shared Qualifikations_Status = let
         Gefiltert,
         List.Select(
             {
-                {"Auditor_LookupId",     "Auditor_SP_ID"},
-                {"approval_lookup_idId", "Approval_SP_ID"}
+                {"Auditor_Lookup: ID",      "Auditor_SP_ID"},
+                {"Auditor_LookupId",        "Auditor_SP_ID"},
+                {"Qualifikation0: ID",      "Qualifikation0Id"},
+                {"approval_lookup_id: ID",  "Approval_SP_ID"},
+                {"approval_lookup_idId",    "Approval_SP_ID"}
             },
             each List.Contains(Table.ColumnNames(Gefiltert), _{0})
         )
