@@ -99,18 +99,16 @@ shared Qualifikations_Status = let
         List.Transform(Table.ColumnNames(Raw), each {_, null})
     ),
 
-    // Lookup-IDs erscheinen in SharePoint.Tables als "FeldName: ID"
-    // Mehrere Kandidaten angegeben – nur vorhandene werden übernommen
     GewuenschteSpalten = {
         "ID",
-        "Auditor_Lookup: ID",       // Lookup-ID für Auditor
-        "Qualifikation0: ID",       // Lookup-ID für Qualifikation
-        "Qualifikation0Id",         // Fallback (falls direkt vorhanden)
+        "Auditor_Lookup: ID",
+        "Qualifikation0: ID",
+        "Qualifikation0Id",
         "Status",
         "Gültig_ab",
         "Gültig_bis",
-        "approval_lookup_id: ID",   // Lookup-ID für Approval
-        "approval_lookup_idId",     // Fallback
+        "approval_lookup_id: ID",
+        "approval_lookup_idId",
         "Datum_Erstberufung_Assistant_Tra",
         "Datum_Erstberufung_Co_Auditor",
         "Datum_Erstberufung_Lead_Auditor",
