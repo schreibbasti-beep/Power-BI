@@ -1,28 +1,22 @@
 section Section1;
 
 shared Qualifikations_Regelwerk = let
-    Quelle = SharePoint.Tables(
-        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
-        [ApiVersion = 15]
+    Quelle = OData.Feed(
+        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
+        & "/_api/lists/getbytitle('Qualifikations_Regelwerk')/items"
+        & "?$select=ID,Title,Berufung_Monate,Anzahl_Monitorings,Anzahl_Audits,"
+        & "Anzahl_Stand_der_Technik_Schulun,Anzahl_ERFA"
+        & "&$top=5000",
+        null,
+        [Implementation = "2.0"]
     ),
-    Raw = Quelle{[Title="Qualifikations_Regelwerk"]}[Items],
 
     OhneErrors = Table.ReplaceErrorValues(
-        Raw,
-        List.Transform(Table.ColumnNames(Raw), each {_, null})
+        Quelle,
+        List.Transform(Table.ColumnNames(Quelle), each {_, null})
     ),
 
-    Gefiltert = Table.SelectColumns(OhneErrors, {
-        "ID",
-        "Title",
-        "Berufung_Monate",
-        "Anzahl_Monitorings",
-        "Anzahl_Audits",
-        "Anzahl_Stand_der_Technik_Schulun",
-        "Anzahl_ERFA"
-    }),
-
-    Umbenannt = Table.RenameColumns(Gefiltert, {
+    Umbenannt = Table.RenameColumns(OhneErrors, {
         {"ID",    "Quali_SP_ID"},
         {"Title", "Qualifikation_Name"}
     }),

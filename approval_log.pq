@@ -1,34 +1,47 @@
 section Section1;
 
 shared approval_log = let
-    Quelle = SharePoint.Tables(
-        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
-        [ApiVersion = 15]
+    // Auditor_Lookup / Qualifikation_Lookup sind SharePoint-Lookup-Spalten.
+    // Der Textwert wird via $expand geladen und danach als Record expandiert.
+    // GültigkeitderformalenReber hat einen Umlaut – wird wie in Qualifikations_Status
+    // über NormalizeUmlaute behandelt.
+    Quelle = OData.Feed(
+        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
+        & "/_api/lists/getbytitle('approval_log')/items"
+        & "?$select=ID,Auditor_LookupId,Qualifikation_LookupId,Art,Datum,Kommentar,Status,"
+        & "formaleReberufung,G_x00fc_ltigkeitderformalenReber,abweichendeDauer,Created,"
+        & "Auditor_Lookup/Title,Qualifikation_Lookup/Title"
+        & "&$expand=Auditor_Lookup,Qualifikation_Lookup"
+        & "&$top=5000",
+        null,
+        [Implementation = "2.0"]
     ),
-    Log_Raw = Quelle{[Title="approval_log"]}[Items],
+
+    // Lookup-Record-Spalten auf den Title-Wert reduzieren
+    ExpandAuditor = Table.ExpandRecordColumn(
+        Quelle, "Auditor_Lookup", {"Title"}, {"Auditor_Lookup"}
+    ),
+    ExpandQuali = Table.ExpandRecordColumn(
+        ExpandAuditor, "Qualifikation_Lookup", {"Title"}, {"Qualifikation_Lookup"}
+    ),
+
+    // Umlaut-kodierte Spaltennamen normalisieren
+    NormalizeUmlaute = let
+        Cols = Table.ColumnNames(ExpandQuali),
+        RenameList = List.Select(
+            {{"G_x00fc_ltigkeitderformalenReber", "GültigkeitderformalenReber"}},
+            each List.Contains(Cols, _{0})
+        )
+    in
+        if List.IsEmpty(RenameList) then ExpandQuali
+        else Table.RenameColumns(ExpandQuali, RenameList),
 
     OhneErrors = Table.ReplaceErrorValues(
-        Log_Raw,
-        List.Transform(Table.ColumnNames(Log_Raw), each {_, null})
+        NormalizeUmlaute,
+        List.Transform(Table.ColumnNames(NormalizeUmlaute), each {_, null})
     ),
 
-    Gefiltert = Table.SelectColumns(OhneErrors, {
-        "ID",
-        "Auditor_LookupId",
-        "Qualifikation_LookupId",
-        "Art",
-        "Datum",
-        "Kommentar",
-        "Status",
-        "formaleReberufung",
-        "GültigkeitderformalenReber",
-        "abweichendeDauer",
-        "Created",
-        "Auditor_Lookup",
-        "Qualifikation_Lookup"
-    }),
-
-    Umbenannt = Table.RenameColumns(Gefiltert, {
+    Umbenannt = Table.RenameColumns(OhneErrors, {
         {"Auditor_LookupId",           "Auditor_SP_ID"},
         {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},

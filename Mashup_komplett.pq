@@ -1,30 +1,21 @@
 section Section1;
 
 shared Auditoren_Stammdaten = let
-    Quelle = SharePoint.Tables(
-        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
-        [ApiVersion = 15]
+    Quelle = OData.Feed(
+        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
+        & "/_api/lists/getbytitle('Auditoren_Stammdaten')/items"
+        & "?$select=ID,Title,Nachname,Vorname,Geschlecht,Email_Adresse,Land_Name,Land_kurz,PLZ"
+        & "&$top=5000",
+        null,
+        [Implementation = "2.0"]
     ),
-    Raw = Quelle{[Title="Auditoren_Stammdaten"]}[Items],
 
     OhneErrors = Table.ReplaceErrorValues(
-        Raw,
-        List.Transform(Table.ColumnNames(Raw), each {_, null})
+        Quelle,
+        List.Transform(Table.ColumnNames(Quelle), each {_, null})
     ),
 
-    Gefiltert = Table.SelectColumns(OhneErrors, {
-        "ID",
-        "Title",
-        "Nachname",
-        "Vorname",
-        "Geschlecht",
-        "Email_Adresse",
-        "Land_Name",
-        "Land_kurz",
-        "PLZ"
-    }),
-
-    Umbenannt = Table.RenameColumns(Gefiltert, {
+    Umbenannt = Table.RenameColumns(OhneErrors, {
         {"ID",         "Auditor_SP_ID"},
         {"Title",      "Auditor_Nummer"},
         {"Geschlecht", "Anrede"}
@@ -45,28 +36,22 @@ in
     Typen;
 
 shared Qualifikations_Regelwerk = let
-    Quelle = SharePoint.Tables(
-        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
-        [ApiVersion = 15]
+    Quelle = OData.Feed(
+        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
+        & "/_api/lists/getbytitle('Qualifikations_Regelwerk')/items"
+        & "?$select=ID,Title,Berufung_Monate,Anzahl_Monitorings,Anzahl_Audits,"
+        & "Anzahl_Stand_der_Technik_Schulun,Anzahl_ERFA"
+        & "&$top=5000",
+        null,
+        [Implementation = "2.0"]
     ),
-    Raw = Quelle{[Title="Qualifikations_Regelwerk"]}[Items],
 
     OhneErrors = Table.ReplaceErrorValues(
-        Raw,
-        List.Transform(Table.ColumnNames(Raw), each {_, null})
+        Quelle,
+        List.Transform(Table.ColumnNames(Quelle), each {_, null})
     ),
 
-    Gefiltert = Table.SelectColumns(OhneErrors, {
-        "ID",
-        "Title",
-        "Berufung_Monate",
-        "Anzahl_Monitorings",
-        "Anzahl_Audits",
-        "Anzahl_Stand_der_Technik_Schulun",
-        "Anzahl_ERFA"
-    }),
-
-    Umbenannt = Table.RenameColumns(Gefiltert, {
+    Umbenannt = Table.RenameColumns(OhneErrors, {
         {"ID",    "Quali_SP_ID"},
         {"Title", "Qualifikation_Name"}
     }),
@@ -84,32 +69,40 @@ in
     Typen;
 
 shared Qualifikations_Status = let
-    Quelle = SharePoint.Tables(
-        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
-        [ApiVersion = 15]
+    // Hinweis: Spalten mit Umlauten (Gültig_ab, Gültig_bis) werden nach dem Laden
+    // ggf. als G_x00fc_ltig_ab / G_x00fc_ltig_bis zurückgegeben (SharePoint-interne
+    // Kodierung). Der Rename-Schritt "NormalizeUmlaute" behandelt beide Varianten.
+    Quelle = OData.Feed(
+        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
+        & "/_api/lists/getbytitle('Qualifikations_Status')/items"
+        & "?$select=ID,Auditor_LookupId,Qualifikation0Id,G_x00fc_ltig_ab,G_x00fc_ltig_bis,"
+        & "quali_log,approval_lookup_idId,Status,"
+        & "Datum_Erstberufung_Assistant_Tra,Datum_Erstberufung_Co_Auditor,Datum_Erstberufung_Lead_Auditor"
+        & "&$top=5000",
+        null,
+        [Implementation = "2.0"]
     ),
-    Raw = Quelle{[Title="Qualifikations_Status"]}[Items],
+
+    // Umlaut-kodierte Spaltennamen normalisieren (falls SharePoint sie enkodiert zurückgibt)
+    NormalizeUmlaute = let
+        Cols = Table.ColumnNames(Quelle),
+        RenameList = List.Select(
+            {
+                {"G_x00fc_ltig_ab",  "Gültig_ab"},
+                {"G_x00fc_ltig_bis", "Gültig_bis"}
+            },
+            each List.Contains(Cols, _{0})
+        )
+    in
+        if List.IsEmpty(RenameList) then Quelle
+        else Table.RenameColumns(Quelle, RenameList),
 
     OhneErrors = Table.ReplaceErrorValues(
-        Raw,
-        List.Transform(Table.ColumnNames(Raw), each {_, null})
+        NormalizeUmlaute,
+        List.Transform(Table.ColumnNames(NormalizeUmlaute), each {_, null})
     ),
 
-    Gefiltert = Table.SelectColumns(OhneErrors, {
-        "ID",
-        "Auditor_LookupId",
-        "Qualifikation0Id",
-        "Gültig_ab",
-        "Gültig_bis",
-        "quali_log",
-        "approval_lookup_idId",
-        "Status",
-        "Datum_Erstberufung_Assistant_Tra",
-        "Datum_Erstberufung_Co_Auditor",
-        "Datum_Erstberufung_Lead_Auditor"
-    }),
-
-    Umbenannt = Table.RenameColumns(Gefiltert, {
+    Umbenannt = Table.RenameColumns(OhneErrors, {
         {"Auditor_LookupId",     "Auditor_SP_ID"},
         {"Qualifikation0Id",     "Quali_SP_ID"},
         {"approval_lookup_idId", "Approval_SP_ID"}
@@ -132,34 +125,47 @@ in
     Typen;
 
 shared approval_log = let
-    Quelle = SharePoint.Tables(
-        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
-        [ApiVersion = 15]
+    // Auditor_Lookup / Qualifikation_Lookup sind SharePoint-Lookup-Spalten.
+    // Der Textwert wird via $expand geladen und danach als Record expandiert.
+    // GültigkeitderformalenReber hat einen Umlaut – wird wie in Qualifikations_Status
+    // über NormalizeUmlaute behandelt.
+    Quelle = OData.Feed(
+        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
+        & "/_api/lists/getbytitle('approval_log')/items"
+        & "?$select=ID,Auditor_LookupId,Qualifikation_LookupId,Art,Datum,Kommentar,Status,"
+        & "formaleReberufung,G_x00fc_ltigkeitderformalenReber,abweichendeDauer,Created,"
+        & "Auditor_Lookup/Title,Qualifikation_Lookup/Title"
+        & "&$expand=Auditor_Lookup,Qualifikation_Lookup"
+        & "&$top=5000",
+        null,
+        [Implementation = "2.0"]
     ),
-    Log_Raw = Quelle{[Title="approval_log"]}[Items],
+
+    // Lookup-Record-Spalten auf den Title-Wert reduzieren
+    ExpandAuditor = Table.ExpandRecordColumn(
+        Quelle, "Auditor_Lookup", {"Title"}, {"Auditor_Lookup"}
+    ),
+    ExpandQuali = Table.ExpandRecordColumn(
+        ExpandAuditor, "Qualifikation_Lookup", {"Title"}, {"Qualifikation_Lookup"}
+    ),
+
+    // Umlaut-kodierte Spaltennamen normalisieren
+    NormalizeUmlaute = let
+        Cols = Table.ColumnNames(ExpandQuali),
+        RenameList = List.Select(
+            {{"G_x00fc_ltigkeitderformalenReber", "GültigkeitderformalenReber"}},
+            each List.Contains(Cols, _{0})
+        )
+    in
+        if List.IsEmpty(RenameList) then ExpandQuali
+        else Table.RenameColumns(ExpandQuali, RenameList),
 
     OhneErrors = Table.ReplaceErrorValues(
-        Log_Raw,
-        List.Transform(Table.ColumnNames(Log_Raw), each {_, null})
+        NormalizeUmlaute,
+        List.Transform(Table.ColumnNames(NormalizeUmlaute), each {_, null})
     ),
 
-    Gefiltert = Table.SelectColumns(OhneErrors, {
-        "ID",
-        "Auditor_LookupId",
-        "Qualifikation_LookupId",
-        "Art",
-        "Datum",
-        "Kommentar",
-        "Status",
-        "formaleReberufung",
-        "GültigkeitderformalenReber",
-        "abweichendeDauer",
-        "Created",
-        "Auditor_Lookup",
-        "Qualifikation_Lookup"
-    }),
-
-    Umbenannt = Table.RenameColumns(Gefiltert, {
+    Umbenannt = Table.RenameColumns(OhneErrors, {
         {"Auditor_LookupId",           "Auditor_SP_ID"},
         {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},
