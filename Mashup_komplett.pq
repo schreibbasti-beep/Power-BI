@@ -5,41 +5,42 @@ shared Auditoren_Stammdaten = let
         "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
         [ApiVersion = 15]
     ),
-    Auditoren_Raw = Quelle{[Title="Auditoren_Stammdaten"]}[Items],
-    GewuenschteSpalten = {"ID", "Title", "Nachname", "Vorname", "Geschlecht",
-                          "Email_Adresse", "Land_kurz", "Land_Name", "PLZ"},
-    VorhandeneSpalten = List.Intersect({
-        GewuenschteSpalten,
-        Table.ColumnNames(Auditoren_Raw)
-    }),
-    Gefiltert = Table.SelectColumns(Auditoren_Raw, VorhandeneSpalten),
-    Umbenannt = Table.RenameColumns(
-        Gefiltert,
-        List.Select(
-            {
-                {"Title",      "Auditor_Nummer"},
-                {"ID",         "Auditor_SP_ID"},
-                {"Geschlecht", "Anrede"}
-            },
-            each List.Contains(Table.ColumnNames(Gefiltert), _{0})
-        )
+    Raw = Quelle{[Title="Auditoren_Stammdaten"]}[Items],
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Raw,
+        List.Transform(Table.ColumnNames(Raw), each {_, null})
     ),
-    AlleTypen = {
+
+    Gefiltert = Table.SelectColumns(OhneErrors, {
+        "ID",
+        "Title",
+        "Nachname",
+        "Vorname",
+        "Geschlecht",
+        "Email_Adresse",
+        "Land_Name",
+        "Land_kurz",
+        "PLZ"
+    }),
+
+    Umbenannt = Table.RenameColumns(Gefiltert, {
+        {"ID",         "Auditor_SP_ID"},
+        {"Title",      "Auditor_Nummer"},
+        {"Geschlecht", "Anrede"}
+    }),
+
+    Typen = Table.TransformColumnTypes(Umbenannt, {
         {"Auditor_SP_ID",  Int64.Type},
         {"Auditor_Nummer", type text},
         {"Nachname",       type text},
         {"Vorname",        type text},
         {"Anrede",         type text},
         {"Email_Adresse",  type text},
-        {"Land_kurz",      type text},
         {"Land_Name",      type text},
+        {"Land_kurz",      type text},
         {"PLZ",            type text}
-    },
-    GueltigeTypen = List.Select(
-        AlleTypen,
-        each List.Contains(Table.ColumnNames(Umbenannt), _{0})
-    ),
-    Typen = Table.TransformColumnTypes(Umbenannt, GueltigeTypen)
+    })
 in
     Typen;
 
@@ -48,46 +49,41 @@ shared Qualifikations_Regelwerk = let
         "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
         [ApiVersion = 15]
     ),
-    Regelwerk_Raw = Quelle{[Title="Qualifikations_Regelwerk"]}[Items],
-    GewuenschteSpalten = {
-        "ID", "Title", "Berufung_Monate", "Anzahl_Monitorings",
-        "Anzahl_Audits", "Anzahl_Stand_der_Technik_Schulun", "Anzahl_ERFA"
-    },
-    VorhandeneSpalten = List.Intersect({
-        GewuenschteSpalten,
-        Table.ColumnNames(Regelwerk_Raw)
+    Raw = Quelle{[Title="Qualifikations_Regelwerk"]}[Items],
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Raw,
+        List.Transform(Table.ColumnNames(Raw), each {_, null})
+    ),
+
+    Gefiltert = Table.SelectColumns(OhneErrors, {
+        "ID",
+        "Title",
+        "Berufung_Monate",
+        "Anzahl_Monitorings",
+        "Anzahl_Audits",
+        "Anzahl_Stand_der_Technik_Schulun",
+        "Anzahl_ERFA"
     }),
-    Gefiltert = Table.SelectColumns(Regelwerk_Raw, VorhandeneSpalten),
-    Umbenannt = Table.RenameColumns(
-        Gefiltert,
-        List.Select(
-            {
-                {"Title", "Qualifikation_Name"},
-                {"ID",    "Quali_SP_ID"}
-            },
-            each List.Contains(Table.ColumnNames(Gefiltert), _{0})
-        )
-    ),
-    AlleTypen = {
-        {"Quali_SP_ID",                         Int64.Type},
-        {"Qualifikation_Name",                  type text},
-        {"Berufung_Monate",                     Int64.Type},
-        {"Anzahl_Monitorings",                  Int64.Type},
-        {"Anzahl_Audits",                       Int64.Type},
-        {"Anzahl_Stand_der_Technik_Schulun",    Int64.Type},
-        {"Anzahl_ERFA",                         Int64.Type}
-    },
-    GueltigeTypen = List.Select(
-        AlleTypen,
-        each List.Contains(Table.ColumnNames(Umbenannt), _{0})
-    ),
-    Typen = Table.TransformColumnTypes(Umbenannt, GueltigeTypen)
+
+    Umbenannt = Table.RenameColumns(Gefiltert, {
+        {"ID",    "Quali_SP_ID"},
+        {"Title", "Qualifikation_Name"}
+    }),
+
+    Typen = Table.TransformColumnTypes(Umbenannt, {
+        {"Quali_SP_ID",                      Int64.Type},
+        {"Qualifikation_Name",               type text},
+        {"Berufung_Monate",                  Int64.Type},
+        {"Anzahl_Monitorings",               Int64.Type},
+        {"Anzahl_Audits",                    Int64.Type},
+        {"Anzahl_Stand_der_Technik_Schulun", Int64.Type},
+        {"Anzahl_ERFA",                      Int64.Type}
+    })
 in
     Typen;
 
 shared Qualifikations_Status = let
-    // SharePoint.Tables statt OData.Feed – vermeidet Auth-Probleme ("Unerwarteter Dokumenttyp")
-    // und nutzt Anzeigenamen (Gültig_ab funktioniert direkt)
     Quelle = SharePoint.Tables(
         "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
         [ApiVersion = 15]
@@ -99,46 +95,31 @@ shared Qualifikations_Status = let
         List.Transform(Table.ColumnNames(Raw), each {_, null})
     ),
 
-    GewuenschteSpalten = {
+    Gefiltert = Table.SelectColumns(OhneErrors, {
         "ID",
-        "Auditor_Lookup: ID",
-        "Qualifikation0: ID",
+        "Auditor_LookupId",
         "Qualifikation0Id",
-        "Status",
         "Gültig_ab",
         "Gültig_bis",
-        "approval_lookup_id: ID",
+        "quali_log",
         "approval_lookup_idId",
+        "Status",
         "Datum_Erstberufung_Assistant_Tra",
         "Datum_Erstberufung_Co_Auditor",
-        "Datum_Erstberufung_Lead_Auditor",
-        "quali_log"
-    },
-    VorhandeneSpalten = List.Intersect({
-        GewuenschteSpalten,
-        Table.ColumnNames(OhneErrors)
+        "Datum_Erstberufung_Lead_Auditor"
     }),
-    Gefiltert = Table.SelectColumns(OhneErrors, VorhandeneSpalten),
 
-    Umbenannt = Table.RenameColumns(
-        Gefiltert,
-        List.Select(
-            {
-                {"Auditor_Lookup: ID",      "Auditor_SP_ID"},
-                {"Auditor_LookupId",        "Auditor_SP_ID"},
-                {"Qualifikation0: ID",      "Qualifikation0Id"},
-                {"approval_lookup_id: ID",  "Approval_SP_ID"},
-                {"approval_lookup_idId",    "Approval_SP_ID"}
-            },
-            each List.Contains(Table.ColumnNames(Gefiltert), _{0})
-        )
-    ),
+    Umbenannt = Table.RenameColumns(Gefiltert, {
+        {"Auditor_LookupId",     "Auditor_SP_ID"},
+        {"Qualifikation0Id",     "Quali_SP_ID"},
+        {"approval_lookup_idId", "Approval_SP_ID"}
+    }),
 
-    AlleTypen = {
+    Typen = Table.TransformColumnTypes(Umbenannt, {
         {"ID",                               Int64.Type},
         {"Auditor_SP_ID",                    Int64.Type},
+        {"Quali_SP_ID",                      Int64.Type},
         {"Approval_SP_ID",                   Int64.Type},
-        {"Qualifikation0Id",                 type text},
         {"Status",                           type text},
         {"Gültig_ab",                        type date},
         {"Gültig_bis",                       type date},
@@ -146,12 +127,7 @@ shared Qualifikations_Status = let
         {"Datum_Erstberufung_Co_Auditor",    type date},
         {"Datum_Erstberufung_Lead_Auditor",  type date},
         {"quali_log",                        type text}
-    },
-    GueltigeTypen = List.Select(
-        AlleTypen,
-        each List.Contains(Table.ColumnNames(Umbenannt), _{0})
-    ),
-    Typen = Table.TransformColumnTypes(Umbenannt, GueltigeTypen)
+    })
 in
     Typen;
 
@@ -167,33 +143,34 @@ shared approval_log = let
         List.Transform(Table.ColumnNames(Log_Raw), each {_, null})
     ),
 
-    GewuenschteSpalten = {
-        "ID", "Auditor_Lookup", "Qualifikation_Lookup",
-        "Art", "Datum", "formaleReberufung", "GültigkeitderformalenReber",
-        "Status", "Kommentar", "Erstellt", "abweichendeDauer",
-        "Auditor_Lookup_Nachname: ID", "Qualifikation_Lookup_Titel: ID"
-    },
-    VorhandeneSpalten = List.Intersect({
-        GewuenschteSpalten,
-        Table.ColumnNames(OhneErrors)
+    Gefiltert = Table.SelectColumns(OhneErrors, {
+        "ID",
+        "Auditor_LookupId",
+        "Qualifikation_LookupId",
+        "Art",
+        "Datum",
+        "Kommentar",
+        "Status",
+        "formaleReberufung",
+        "GültigkeitderformalenReber",
+        "abweichendeDauer",
+        "Created",
+        "Auditor_Lookup",
+        "Qualifikation_Lookup"
     }),
-    Gefiltert = Table.SelectColumns(OhneErrors, VorhandeneSpalten),
-    Umbenannt = Table.RenameColumns(
-        Gefiltert,
-        List.Select(
-            {
-                {"Auditor_Lookup_Nachname: ID",    "Auditor_SP_ID"},
-                {"Qualifikation_Lookup_Titel: ID", "Quali_SP_ID"},
-                {"Auditor_Lookup",                 "Auditor_Nachname"},
-                {"Qualifikation_Lookup",           "Qualifikation_Name"},
-                {"GültigkeitderformalenReber",     "gültig_bis"},
-                {"formaleReberufung",              "gültig_von"},
-                {"Datum",                          "Datum_CL"}
-            },
-            each List.Contains(Table.ColumnNames(Gefiltert), _{0})
-        )
-    ),
-    AlleTypen = {
+
+    Umbenannt = Table.RenameColumns(Gefiltert, {
+        {"Auditor_LookupId",           "Auditor_SP_ID"},
+        {"Qualifikation_LookupId",     "Quali_SP_ID"},
+        {"Datum",                      "Datum_CL"},
+        {"formaleReberufung",          "gültig_von"},
+        {"GültigkeitderformalenReber", "gültig_bis"},
+        {"Created",                    "Erstellt"},
+        {"Auditor_Lookup",             "Auditor_Nachname"},
+        {"Qualifikation_Lookup",       "Qualifikation_Name"}
+    }),
+
+    Typen = Table.TransformColumnTypes(Umbenannt, {
         {"ID",                 Int64.Type},
         {"Auditor_SP_ID",      Int64.Type},
         {"Quali_SP_ID",        Int64.Type},
@@ -207,11 +184,6 @@ shared approval_log = let
         {"Kommentar",          type text},
         {"Auditor_Nachname",   type text},
         {"Qualifikation_Name", type text}
-    },
-    GueltigeTypen = List.Select(
-        AlleTypen,
-        each List.Contains(Table.ColumnNames(Umbenannt), _{0})
-    ),
-    Typen = Table.TransformColumnTypes(Umbenannt, GueltigeTypen)
+    })
 in
     Typen;
