@@ -161,6 +161,12 @@ shared approval_log = let
         [ApiVersion = 15]
     ),
     Log_Raw = Quelle{[Title="approval_log"]}[Items],
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Log_Raw,
+        List.Transform(Table.ColumnNames(Log_Raw), each {_, null})
+    ),
+
     GewuenschteSpalten = {
         "ID", "Auditor_Lookup", "Qualifikation_Lookup",
         "Art", "Datum", "formaleReberufung", "GültigkeitderformalenReber",
@@ -169,38 +175,38 @@ shared approval_log = let
     },
     VorhandeneSpalten = List.Intersect({
         GewuenschteSpalten,
-        Table.ColumnNames(Log_Raw)
+        Table.ColumnNames(OhneErrors)
     }),
-    Gefiltert = Table.SelectColumns(Log_Raw, VorhandeneSpalten),
+    Gefiltert = Table.SelectColumns(OhneErrors, VorhandeneSpalten),
     Umbenannt = Table.RenameColumns(
         Gefiltert,
         List.Select(
             {
-                {"Auditor_Lookup_Nachname: ID",     "Auditor_SP_ID"},
-                {"Qualifikation_Lookup_Titel: ID",  "Quali_SP_ID"},
-                {"Auditor_Lookup",                  "Auditor_Nachname"},
-                {"Qualifikation_Lookup",            "Qualifikation_Name"},
-                {"GültigkeitderformalenReber",      "gültig_bis"},
-                {"formaleReberufung",               "gültig_von"},
-                {"Datum",                           "Datum_CL"}
+                {"Auditor_Lookup_Nachname: ID",    "Auditor_SP_ID"},
+                {"Qualifikation_Lookup_Titel: ID", "Quali_SP_ID"},
+                {"Auditor_Lookup",                 "Auditor_Nachname"},
+                {"Qualifikation_Lookup",           "Qualifikation_Name"},
+                {"GültigkeitderformalenReber",     "gültig_bis"},
+                {"formaleReberufung",              "gültig_von"},
+                {"Datum",                          "Datum_CL"}
             },
             each List.Contains(Table.ColumnNames(Gefiltert), _{0})
         )
     ),
     AlleTypen = {
-        {"ID",                Int64.Type},
-        {"Auditor_SP_ID",     Int64.Type},
-        {"Quali_SP_ID",       Int64.Type},
-        {"Datum_CL",          type date},
-        {"gueltig_von",       type date},
-        {"gueltig_bis",       type date},
-        {"Erstellt",          type datetime},
-        {"abweichendeDauer",  type number},
-        {"Art",               type text},
-        {"Status",            type text},
-        {"Kommentar",         type text},
-        {"Auditor_Nachname",  type text},
-        {"Qualifikation_Name",type text}
+        {"ID",                 Int64.Type},
+        {"Auditor_SP_ID",      Int64.Type},
+        {"Quali_SP_ID",        Int64.Type},
+        {"Datum_CL",           type date},
+        {"gültig_von",         type date},
+        {"gültig_bis",         type date},
+        {"Erstellt",           type datetime},
+        {"abweichendeDauer",   type number},
+        {"Art",                type text},
+        {"Status",             type text},
+        {"Kommentar",          type text},
+        {"Auditor_Nachname",   type text},
+        {"Qualifikation_Name", type text}
     },
     GueltigeTypen = List.Select(
         AlleTypen,
