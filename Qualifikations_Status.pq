@@ -29,12 +29,7 @@ shared Qualifikations_Status = let
         if List.IsEmpty(RenameList) then Quelle
         else Table.RenameColumns(Quelle, RenameList),
 
-    OhneErrors = Table.ReplaceErrorValues(
-        NormalizeUmlaute,
-        List.Transform(Table.ColumnNames(NormalizeUmlaute), each {_, null})
-    ),
-
-    Umbenannt = Table.RenameColumns(OhneErrors, {
+    Umbenannt = Table.RenameColumns(NormalizeUmlaute, {
         {"Auditor_LookupId",     "Auditor_SP_ID"},
         {"Qualifikation0Id",     "Quali_SP_ID"},
         {"approval_lookup_idId", "Approval_SP_ID"}
@@ -52,6 +47,11 @@ shared Qualifikations_Status = let
         {"Datum_Erstberufung_Co_Auditor",    type date},
         {"Datum_Erstberufung_Lead_Auditor",  type date},
         {"quali_log",                        type text}
-    })
+    }),
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Typen,
+        List.Transform(Table.ColumnNames(Typen), each {_, null})
+    )
 in
-    Typen;
+    OhneErrors;

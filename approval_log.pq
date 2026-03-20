@@ -36,12 +36,7 @@ shared approval_log = let
         if List.IsEmpty(RenameList) then ExpandQuali
         else Table.RenameColumns(ExpandQuali, RenameList),
 
-    OhneErrors = Table.ReplaceErrorValues(
-        NormalizeUmlaute,
-        List.Transform(Table.ColumnNames(NormalizeUmlaute), each {_, null})
-    ),
-
-    Umbenannt = Table.RenameColumns(OhneErrors, {
+    Umbenannt = Table.RenameColumns(NormalizeUmlaute, {
         {"Auditor_LookupId",           "Auditor_SP_ID"},
         {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},
@@ -66,6 +61,11 @@ shared approval_log = let
         {"Kommentar",          type text},
         {"Auditor_Nachname",   type text},
         {"Qualifikation_Name", type text}
-    })
+    }),
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Typen,
+        List.Transform(Table.ColumnNames(Typen), each {_, null})
+    )
 in
-    Typen;
+    OhneErrors;

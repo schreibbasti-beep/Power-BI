@@ -10,12 +10,7 @@ shared Auditoren_Stammdaten = let
         [Implementation = "2.0"]
     ),
 
-    OhneErrors = Table.ReplaceErrorValues(
-        Quelle,
-        List.Transform(Table.ColumnNames(Quelle), each {_, null})
-    ),
-
-    Umbenannt = Table.RenameColumns(OhneErrors, {
+    Umbenannt = Table.RenameColumns(Quelle, {
         {"ID",         "Auditor_SP_ID"},
         {"Title",      "Auditor_Nummer"},
         {"Geschlecht", "Anrede"}
@@ -31,9 +26,14 @@ shared Auditoren_Stammdaten = let
         {"Land_Name",      type text},
         {"Land_kurz",      type text},
         {"PLZ",            type text}
-    })
+    }),
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Typen,
+        List.Transform(Table.ColumnNames(Typen), each {_, null})
+    )
 in
-    Typen;
+    OhneErrors;
 
 shared Qualifikations_Regelwerk = let
     Quelle = OData.Feed(
@@ -46,12 +46,7 @@ shared Qualifikations_Regelwerk = let
         [Implementation = "2.0"]
     ),
 
-    OhneErrors = Table.ReplaceErrorValues(
-        Quelle,
-        List.Transform(Table.ColumnNames(Quelle), each {_, null})
-    ),
-
-    Umbenannt = Table.RenameColumns(OhneErrors, {
+    Umbenannt = Table.RenameColumns(Quelle, {
         {"ID",    "Quali_SP_ID"},
         {"Title", "Qualifikation_Name"}
     }),
@@ -64,9 +59,14 @@ shared Qualifikations_Regelwerk = let
         {"Anzahl_Audits",                    Int64.Type},
         {"Anzahl_Stand_der_Technik_Schulun", Int64.Type},
         {"Anzahl_ERFA",                      Int64.Type}
-    })
+    }),
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Typen,
+        List.Transform(Table.ColumnNames(Typen), each {_, null})
+    )
 in
-    Typen;
+    OhneErrors;
 
 shared Qualifikations_Status = let
     // Hinweis: Spalten mit Umlauten (Gültig_ab, Gültig_bis) werden nach dem Laden
@@ -97,12 +97,7 @@ shared Qualifikations_Status = let
         if List.IsEmpty(RenameList) then Quelle
         else Table.RenameColumns(Quelle, RenameList),
 
-    OhneErrors = Table.ReplaceErrorValues(
-        NormalizeUmlaute,
-        List.Transform(Table.ColumnNames(NormalizeUmlaute), each {_, null})
-    ),
-
-    Umbenannt = Table.RenameColumns(OhneErrors, {
+    Umbenannt = Table.RenameColumns(NormalizeUmlaute, {
         {"Auditor_LookupId",     "Auditor_SP_ID"},
         {"Qualifikation0Id",     "Quali_SP_ID"},
         {"approval_lookup_idId", "Approval_SP_ID"}
@@ -120,9 +115,14 @@ shared Qualifikations_Status = let
         {"Datum_Erstberufung_Co_Auditor",    type date},
         {"Datum_Erstberufung_Lead_Auditor",  type date},
         {"quali_log",                        type text}
-    })
+    }),
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Typen,
+        List.Transform(Table.ColumnNames(Typen), each {_, null})
+    )
 in
-    Typen;
+    OhneErrors;
 
 shared approval_log = let
     // Auditor_Lookup / Qualifikation_Lookup sind SharePoint-Lookup-Spalten.
@@ -160,12 +160,7 @@ shared approval_log = let
         if List.IsEmpty(RenameList) then ExpandQuali
         else Table.RenameColumns(ExpandQuali, RenameList),
 
-    OhneErrors = Table.ReplaceErrorValues(
-        NormalizeUmlaute,
-        List.Transform(Table.ColumnNames(NormalizeUmlaute), each {_, null})
-    ),
-
-    Umbenannt = Table.RenameColumns(OhneErrors, {
+    Umbenannt = Table.RenameColumns(NormalizeUmlaute, {
         {"Auditor_LookupId",           "Auditor_SP_ID"},
         {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},
@@ -190,6 +185,11 @@ shared approval_log = let
         {"Kommentar",          type text},
         {"Auditor_Nachname",   type text},
         {"Qualifikation_Name", type text}
-    })
+    }),
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Typen,
+        List.Transform(Table.ColumnNames(Typen), each {_, null})
+    )
 in
-    Typen;
+    OhneErrors;

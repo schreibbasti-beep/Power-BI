@@ -11,12 +11,7 @@ shared Qualifikations_Regelwerk = let
         [Implementation = "2.0"]
     ),
 
-    OhneErrors = Table.ReplaceErrorValues(
-        Quelle,
-        List.Transform(Table.ColumnNames(Quelle), each {_, null})
-    ),
-
-    Umbenannt = Table.RenameColumns(OhneErrors, {
+    Umbenannt = Table.RenameColumns(Quelle, {
         {"ID",    "Quali_SP_ID"},
         {"Title", "Qualifikation_Name"}
     }),
@@ -29,6 +24,11 @@ shared Qualifikations_Regelwerk = let
         {"Anzahl_Audits",                    Int64.Type},
         {"Anzahl_Stand_der_Technik_Schulun", Int64.Type},
         {"Anzahl_ERFA",                      Int64.Type}
-    })
+    }),
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Typen,
+        List.Transform(Table.ColumnNames(Typen), each {_, null})
+    )
 in
-    Typen;
+    OhneErrors;

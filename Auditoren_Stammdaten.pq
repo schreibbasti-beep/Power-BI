@@ -1,30 +1,16 @@
 section Section1;
 
 shared Auditoren_Stammdaten = let
-    Quelle = SharePoint.Tables(
-        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation",
-        [ApiVersion = 15]
-    ),
-    Raw = Quelle{[Title="Auditoren_Stammdaten"]}[Items],
-
-    OhneErrors = Table.ReplaceErrorValues(
-        Raw,
-        List.Transform(Table.ColumnNames(Raw), each {_, null})
+    Quelle = OData.Feed(
+        "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
+        & "/_api/lists/getbytitle('Auditoren_Stammdaten')/items"
+        & "?$select=ID,Title,Nachname,Vorname,Geschlecht,Email_Adresse,Land_Name,Land_kurz,PLZ"
+        & "&$top=5000",
+        null,
+        [Implementation = "2.0"]
     ),
 
-    Gefiltert = Table.SelectColumns(OhneErrors, {
-        "ID",
-        "Title",
-        "Nachname",
-        "Vorname",
-        "Geschlecht",
-        "Email_Adresse",
-        "Land_Name",
-        "Land_kurz",
-        "PLZ"
-    }),
-
-    Umbenannt = Table.RenameColumns(Gefiltert, {
+    Umbenannt = Table.RenameColumns(Quelle, {
         {"ID",         "Auditor_SP_ID"},
         {"Title",      "Auditor_Nummer"},
         {"Geschlecht", "Anrede"}
@@ -40,6 +26,11 @@ shared Auditoren_Stammdaten = let
         {"Land_Name",      type text},
         {"Land_kurz",      type text},
         {"PLZ",            type text}
-    })
+    }),
+
+    OhneErrors = Table.ReplaceErrorValues(
+        Typen,
+        List.Transform(Table.ColumnNames(Typen), each {_, null})
+    )
 in
-    Typen;
+    OhneErrors;
