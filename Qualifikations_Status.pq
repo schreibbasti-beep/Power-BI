@@ -4,7 +4,7 @@ shared Qualifikations_Status = let
     Quelle = OData.Feed(
         "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
         & "/_api/lists/getbytitle('Qualifikations_Status')/items"
-        & "?$select=ID,Auditor_LookupId,Qualifikation0Id,Gültig_ab,Gültig_bis,"
+        & "?$select=ID,Auditor_LookupId,Qualifikation0Id,G_x00fc_ltig_ab,G_x00fc_ltig_bis,"
         & "quali_log,approval_lookup_idId,Status,"
         & "Datum_Erstberufung_Assistant_Tra,Datum_Erstberufung_Co_Auditor,Datum_Erstberufung_Lead_Auditor"
         & "&$top=5000",
@@ -12,10 +12,13 @@ shared Qualifikations_Status = let
         [Implementation = "2.0"]
     ),
 
+    // Interne _x00fc_-Namen → lesbare Namen + Lookup-IDs umbenennen
     Umbenannt = Table.RenameColumns(Quelle, {
-        {"Auditor_LookupId",     "Auditor_SP_ID"},
-        {"Qualifikation0Id",     "Quali_SP_ID"},
-        {"approval_lookup_idId", "Approval_SP_ID"}
+        {"Auditor_LookupId",       "Auditor_SP_ID"},
+        {"Qualifikation0Id",       "Quali_SP_ID"},
+        {"approval_lookup_idId",   "Approval_SP_ID"},
+        {"G_x00fc_ltig_ab",        "Gültig_ab"},
+        {"G_x00fc_ltig_bis",       "Gültig_bis"}
     }),
 
     Typen = Table.TransformColumnTypes(Umbenannt, {
