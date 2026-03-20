@@ -1,41 +1,31 @@
 section Section1;
 
 shared approval_log = let
-    // Lookup-IDs und Textwerte werden gemeinsam via $expand geladen.
-    // GültigkeitderformalenReber hat einen Umlaut – wird über NormalizeUmlaute behandelt.
+    // Auditor_LookupId / Qualifikation_LookupId sind direkte Integer-Felder.
+    // Auditor_Lookup / Qualifikation_Lookup werden via $expand für den Textwert geladen.
     Quelle = OData.Feed(
         "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
         & "/_api/lists/getbytitle('approval_log')/items"
-        & "?$select=ID,Auditor_Lookup/Id,Auditor_Lookup/Title,"
-        & "Qualifikation_Lookup/Id,Qualifikation_Lookup/Title,"
-        & "Art,Datum,Kommentar,Status,"
-        & "formaleReberufung,G_x00fc_ltigkeitderformalenReber,abweichendeDauer,Created"
+        & "?$select=ID,Auditor_LookupId,Qualifikation_LookupId,Art,Datum,Kommentar,Status,"
+        & "formaleReberufung,GültigkeitderformalenReber,abweichendeDauer,Created,"
+        & "Auditor_Lookup/Title,Qualifikation_Lookup/Title"
         & "&$expand=Auditor_Lookup,Qualifikation_Lookup"
         & "&$top=5000",
         null,
         [Implementation = "2.0"]
     ),
 
-    // Lookup-Record-Spalten auf ID und Textwert expandieren
+    // Lookup-Record-Spalten auf den Textwert (Title) reduzieren
     ExpandAuditor = Table.ExpandRecordColumn(
-        Quelle, "Auditor_Lookup", {"Id", "Title"}, {"Auditor_SP_ID", "Auditor_Nachname"}
+        Quelle, "Auditor_Lookup", {"Title"}, {"Auditor_Nachname"}
     ),
     ExpandQuali = Table.ExpandRecordColumn(
-        ExpandAuditor, "Qualifikation_Lookup", {"Id", "Title"}, {"Quali_SP_ID", "Qualifikation_Name"}
+        ExpandAuditor, "Qualifikation_Lookup", {"Title"}, {"Qualifikation_Name"}
     ),
 
-    // Umlaut-kodierte Spaltennamen normalisieren
-    NormalizeUmlaute = let
-        Cols = Table.ColumnNames(ExpandQuali),
-        RenameList = List.Select(
-            {{"G_x00fc_ltigkeitderformalenReber", "GültigkeitderformalenReber"}},
-            each List.Contains(Cols, _{0})
-        )
-    in
-        if List.IsEmpty(RenameList) then ExpandQuali
-        else Table.RenameColumns(ExpandQuali, RenameList),
-
-    Umbenannt = Table.RenameColumns(NormalizeUmlaute, {
+    Umbenannt = Table.RenameColumns(ExpandQuali, {
+        {"Auditor_LookupId",           "Auditor_SP_ID"},
+        {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},
         {"formaleReberufung",          "gültig_von"},
         {"GültigkeitderformalenReber", "gültig_bis"},
