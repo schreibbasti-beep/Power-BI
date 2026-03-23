@@ -85,11 +85,18 @@ shared Qualifikations_Status = let
         [Implementation = "2.0"]
     ),
 
-    ExpandAuditor = Table.ExpandRecordColumn(
-        Quelle, "Auditor_Lookup", {"ID"}, {"Auditor_SP_ID"}
+    // OData v4 liefert expanded Lookups als Table (nicht Record).
+    // Erste Zeile der Table auslesen; leer = null.
+    MitAuditor = Table.AddColumn(
+        Quelle,
+        "Auditor_SP_ID",
+        each let t = [Auditor_Lookup]
+             in if Table.IsEmpty(t) then null else t{0}[ID],
+        Int64.Type
     ),
+    OhneRoheTabelle = Table.RemoveColumns(MitAuditor, {"Auditor_Lookup"}),
 
-    Umbenannt = Table.RenameColumns(ExpandAuditor, {
+    Umbenannt = Table.RenameColumns(OhneRoheTabelle, {
         {"Qualifikation0Id",     "Quali_SP_ID"},
         {"approval_lookup_idId", "Approval_SP_ID"}
     }),
