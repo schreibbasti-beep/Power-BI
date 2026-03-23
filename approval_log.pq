@@ -14,7 +14,6 @@ shared approval_log = let
         null,
         [Implementation = "2.0"]
     ),
-
     // Lookup-Record-Spalten auf den Textwert (Title) reduzieren
     ExpandAuditor = Table.ExpandRecordColumn(
         Quelle, "Auditor_Lookup", {"Title"}, {"Auditor_Nachname"}
@@ -22,8 +21,8 @@ shared approval_log = let
     ExpandQuali = Table.ExpandRecordColumn(
         ExpandAuditor, "Qualifikation_Lookup", {"Title"}, {"Qualifikation_Name"}
     ),
-
     Umbenannt = Table.RenameColumns(ExpandQuali, {
+        {"ID",                         "Approval_SP_ID"},
         {"Auditor_LookupId",           "Auditor_SP_ID"},
         {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},
@@ -31,9 +30,8 @@ shared approval_log = let
         {"GültigkeitderformalenReber", "gültig_bis"},
         {"Created",                    "Erstellt"}
     }),
-
     Typen = Table.TransformColumnTypes(Umbenannt, {
-        {"ID",                 Int64.Type},
+        {"Approval_SP_ID",     Int64.Type},
         {"Auditor_SP_ID",      Int64.Type},
         {"Quali_SP_ID",        Int64.Type},
         {"Datum_CL",           type date},
@@ -47,7 +45,6 @@ shared approval_log = let
         {"Auditor_Nachname",   type text},
         {"Qualifikation_Name", type text}
     }),
-
     OhneErrors = Table.ReplaceErrorValues(
         Typen,
         List.Transform(Table.ColumnNames(Typen), each {_, null})

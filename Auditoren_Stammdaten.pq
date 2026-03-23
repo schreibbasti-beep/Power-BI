@@ -9,13 +9,11 @@ shared Auditoren_Stammdaten = let
         null,
         [Implementation = "2.0"]
     ),
-
     Umbenannt = Table.RenameColumns(Quelle, {
         {"ID",         "Auditor_SP_ID"},
         {"Title",      "Auditor_Nummer"},
         {"Geschlecht", "Anrede"}
     }),
-
     Typen = Table.TransformColumnTypes(Umbenannt, {
         {"Auditor_SP_ID",  Int64.Type},
         {"Auditor_Nummer", type text},
@@ -27,7 +25,6 @@ shared Auditoren_Stammdaten = let
         {"Land_kurz",      type text},
         {"PLZ",            type text}
     }),
-
     OhneErrors = Table.ReplaceErrorValues(
         Typen,
         List.Transform(Table.ColumnNames(Typen), each {_, null})

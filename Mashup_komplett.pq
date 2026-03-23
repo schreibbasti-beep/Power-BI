@@ -9,13 +9,11 @@ shared Auditoren_Stammdaten = let
         null,
         [Implementation = "2.0"]
     ),
-
     Umbenannt = Table.RenameColumns(Quelle, {
         {"ID",         "Auditor_SP_ID"},
         {"Title",      "Auditor_Nummer"},
         {"Geschlecht", "Anrede"}
     }),
-
     Typen = Table.TransformColumnTypes(Umbenannt, {
         {"Auditor_SP_ID",  Int64.Type},
         {"Auditor_Nummer", type text},
@@ -27,7 +25,6 @@ shared Auditoren_Stammdaten = let
         {"Land_kurz",      type text},
         {"PLZ",            type text}
     }),
-
     OhneErrors = Table.ReplaceErrorValues(
         Typen,
         List.Transform(Table.ColumnNames(Typen), each {_, null})
@@ -45,12 +42,10 @@ shared Qualifikations_Regelwerk = let
         null,
         [Implementation = "2.0"]
     ),
-
     Umbenannt = Table.RenameColumns(Quelle, {
         {"ID",    "Quali_SP_ID"},
         {"Title", "Qualifikation_Name"}
     }),
-
     Typen = Table.TransformColumnTypes(Umbenannt, {
         {"Quali_SP_ID",                      Int64.Type},
         {"Qualifikation_Name",               type text},
@@ -60,7 +55,6 @@ shared Qualifikations_Regelwerk = let
         {"Anzahl_Stand_der_Technik_Schulun", Int64.Type},
         {"Anzahl_ERFA",                      Int64.Type}
     }),
-
     OhneErrors = Table.ReplaceErrorValues(
         Typen,
         List.Transform(Table.ColumnNames(Typen), each {_, null})
@@ -84,7 +78,6 @@ shared Qualifikations_Status = let
         null,
         [Implementation = "2.0"]
     ),
-
     // OData v4 liefert expanded Lookups als Table (nicht Record).
     // Erste Zeile der Table auslesen; leer = null.
     MitAuditor = Table.AddColumn(
@@ -95,32 +88,35 @@ shared Qualifikations_Status = let
         Int64.Type
     ),
     OhneRoheTabelle = Table.RemoveColumns(MitAuditor, {"Auditor_Lookup"}),
-
     Umbenannt = Table.RenameColumns(OhneRoheTabelle, {
         {"Qualifikation0Id",     "Quali_SP_ID"},
         {"approval_lookup_idId", "Approval_SP_ID"}
     }),
-
     Typen = Table.TransformColumnTypes(Umbenannt, {
         {"ID",                               Int64.Type},
         {"Auditor_SP_ID",                    Int64.Type},
         {"Quali_SP_ID",                      Int64.Type},
         {"Approval_SP_ID",                   Int64.Type},
         {"Status",                           type text},
-        {"G_x00fc_ltig_ab",                  type date},
-        {"G_x00fc_ltig_bis",                 type date},
+        {"Gültig_ab",                        type date},
+        {"Gültig_bis",                       type date},
         {"Datum_Erstberufung_Assistant_Tra", type date},
         {"Datum_Erstberufung_Co_Auditor",    type date},
         {"Datum_Erstberufung_Lead_Auditor",  type date},
         {"quali_log",                        type text}
     }),
-
     OhneErrors = Table.ReplaceErrorValues(
         Typen,
         List.Transform(Table.ColumnNames(Typen), each {_, null})
-    )
+    ),
+    #"Neu angeordnete Spalten" = Table.ReorderColumns(OhneErrors, {
+        "Id", "Quali_SP_ID", "Auditor_SP_ID", "Gültig_ab", "Gültig_bis",
+        "quali_log", "Approval_SP_ID", "Status",
+        "Datum_Erstberufung_Assistant_Tra", "Datum_Erstberufung_Co_Auditor",
+        "Datum_Erstberufung_Lead_Auditor", "ID"
+    })
 in
-    OhneErrors;
+    #"Neu angeordnete Spalten";
 
 shared approval_log = let
     // Auditor_LookupId / Qualifikation_LookupId sind direkte Integer-Felder.
@@ -136,7 +132,6 @@ shared approval_log = let
         null,
         [Implementation = "2.0"]
     ),
-
     // Lookup-Record-Spalten auf den Textwert (Title) reduzieren
     ExpandAuditor = Table.ExpandRecordColumn(
         Quelle, "Auditor_Lookup", {"Title"}, {"Auditor_Nachname"}
@@ -144,8 +139,8 @@ shared approval_log = let
     ExpandQuali = Table.ExpandRecordColumn(
         ExpandAuditor, "Qualifikation_Lookup", {"Title"}, {"Qualifikation_Name"}
     ),
-
     Umbenannt = Table.RenameColumns(ExpandQuali, {
+        {"ID",                         "Approval_SP_ID"},
         {"Auditor_LookupId",           "Auditor_SP_ID"},
         {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},
@@ -153,9 +148,8 @@ shared approval_log = let
         {"GültigkeitderformalenReber", "gültig_bis"},
         {"Created",                    "Erstellt"}
     }),
-
     Typen = Table.TransformColumnTypes(Umbenannt, {
-        {"ID",                 Int64.Type},
+        {"Approval_SP_ID",     Int64.Type},
         {"Auditor_SP_ID",      Int64.Type},
         {"Quali_SP_ID",        Int64.Type},
         {"Datum_CL",           type date},
@@ -169,7 +163,6 @@ shared approval_log = let
         {"Auditor_Nachname",   type text},
         {"Qualifikation_Name", type text}
     }),
-
     OhneErrors = Table.ReplaceErrorValues(
         Typen,
         List.Transform(Table.ColumnNames(Typen), each {_, null})
