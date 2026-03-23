@@ -1,0 +1,118 @@
+// ============================================================
+// Ampelsystem – Qualifikations_Status
+// Basis: Gültig_bis-Datum gegenüber dem heutigen Tag
+//
+// Rot    = abgelaufen           (Gültig_bis < Heute)
+// Gelb   = läuft in ≤ 90 Tagen ab (Heute ≤ Gültig_bis ≤ Heute+90)
+// Grün   = gültig               (Gültig_bis > Heute+90)
+// Grau   = kein Datum gesetzt
+// ============================================================
+
+
+// ------------------------------------------------------------
+// 1) Ampel_Status  →  Text für Slicer, Tabellen, Tooltips
+// ------------------------------------------------------------
+Ampel_Status =
+VAR GueltigBis = MAX(Qualifikations_Status[Gültig_bis])
+VAR Heute      = TODAY()
+RETURN
+    IF(
+        ISBLANK(GueltigBis),
+        "Kein Datum",
+        IF(
+            GueltigBis < Heute,
+            "Rot",
+            IF(
+                GueltigBis <= Heute + 90,
+                "Gelb",
+                "Grün"
+            )
+        )
+    )
+
+
+// ------------------------------------------------------------
+// 2) Ampel_Symbol  →  Unicode-Kreise für bedingte Formatierung
+//    🔴 = Rot  🟡 = Gelb  🟢 = Grün  ⚪ = Kein Datum
+// ------------------------------------------------------------
+Ampel_Symbol =
+VAR GueltigBis = MAX(Qualifikations_Status[Gültig_bis])
+VAR Heute      = TODAY()
+RETURN
+    IF(
+        ISBLANK(GueltigBis),
+        "⚪",
+        IF(
+            GueltigBis < Heute,
+            "🔴",
+            IF(
+                GueltigBis <= Heute + 90,
+                "🟡",
+                "🟢"
+            )
+        )
+    )
+
+
+// ------------------------------------------------------------
+// 3) Ampel_Sortierung  →  Zahl für korrekte Sortierreihenfolge
+//    1 = Rot (dringendste oben), 2 = Gelb, 3 = Grün, 4 = Kein Datum
+//    Measure einer separaten Hilfsspalte zuweisen oder
+//    in "Nach Wert sortieren" der Ampel_Status-Spalte nutzen.
+// ------------------------------------------------------------
+Ampel_Sortierung =
+VAR GueltigBis = MAX(Qualifikations_Status[Gültig_bis])
+VAR Heute      = TODAY()
+RETURN
+    IF(
+        ISBLANK(GueltigBis),
+        4,
+        IF(
+            GueltigBis < Heute,
+            1,
+            IF(
+                GueltigBis <= Heute + 90,
+                2,
+                3
+            )
+        )
+    )
+
+
+// ------------------------------------------------------------
+// 4) Tage_bis_Ablauf  →  verbleibende Tage als Zahl
+//    Negativ = bereits abgelaufen
+// ------------------------------------------------------------
+Tage_bis_Ablauf =
+VAR GueltigBis = MAX(Qualifikations_Status[Gültig_bis])
+RETURN
+    IF(
+        ISBLANK(GueltigBis),
+        BLANK(),
+        DATEDIFF(TODAY(), GueltigBis, DAY)
+    )
+
+
+// ------------------------------------------------------------
+// 5) Anzahl_je_Ampelfarbe  →  Zählmeasure für KPI-Karten
+//    Verwendung: Im Visual-Filter auf Ampel_Status = "Rot" etc.
+//    ODER direkt als Measure mit gewünschter Farbe:
+// ------------------------------------------------------------
+Anzahl_Rot =
+CALCULATE(
+    COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Gültig_bis] < TODAY()
+)
+
+Anzahl_Gelb =
+CALCULATE(
+    COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Gültig_bis] >= TODAY(),
+    Qualifikations_Status[Gültig_bis] <= TODAY() + 90
+)
+
+Anzahl_Gruen =
+CALCULATE(
+    COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Gültig_bis] > TODAY() + 90
+)
