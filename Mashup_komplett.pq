@@ -72,18 +72,18 @@ shared Qualifikations_Status = let
     Quelle = OData.Feed(
         "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
         & "/_api/lists/getbytitle('Qualifikations_Status')/items"
-        & "?$select=ID,Auditor_Lookup_Nachname_x003a__x/ID,Qualifikation0Id,G_x00fc_ltig_ab,G_x00fc_ltig_bis,"
+        & "?$select=ID,Auditor_Lookup/ID,Qualifikation0Id,G_x00fc_ltig_ab,G_x00fc_ltig_bis,"
         & "quali_log,approval_lookup_idId,Status,"
         & "Datum_Erstberufung_Assistant_Tra,Datum_Erstberufung_Co_Auditor,Datum_Erstberufung_Lead_Auditor"
-        & "&$expand=Auditor_Lookup_Nachname_x003a__x"
+        & "&$expand=Auditor_Lookup"
         & "&$top=5000",
         null,
         [Implementation = "2.0"]
     ),
 
-    // Lookup-Record expandieren → Auditor_SP_ID
+    // Primäres Lookup-Feld expandieren → Auditor_SP_ID
     ExpandAuditor = Table.ExpandRecordColumn(
-        Quelle, "Auditor_Lookup_Nachname_x003a__x", {"ID"}, {"Auditor_SP_ID"}
+        Quelle, "Auditor_Lookup", {"ID"}, {"Auditor_SP_ID"}
     ),
 
     Umbenannt = Table.RenameColumns(ExpandAuditor, {
