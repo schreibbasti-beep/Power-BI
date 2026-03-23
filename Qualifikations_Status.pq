@@ -1,42 +1,21 @@
 section Section1;
 
+// DIAGNOSE-QUERY: Lädt alle Spalten ohne $select, um die echten OData-Spaltennamen zu sehen.
+// Schritt 1: Diese Version in Power BI laden und im Power Query Editor die Spaltennamen prüfen.
+// Schritt 2: Den Auditor-Lookup-Spaltennamen notieren (suche nach Spalten, die "Auditor" enthalten).
+// Schritt 3: Danach diese Query durch die finale Version ersetzen.
 shared Qualifikations_Status = let
-    // Auditor_LookupId ist ein flaches Integer-Feld (analog approval_log).
-    // Kein $expand nötig – direkt in $select aufführen.
+    // Kein $select – alle Felder laden, damit wir die echten Spaltennamen sehen.
     Quelle = OData.Feed(
         "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
         & "/_api/lists/getbytitle('Qualifikations_Status')/items"
-        & "?$select=ID,Auditor_LookupId,Qualifikation0Id,G_x00fc_ltig_ab,G_x00fc_ltig_bis,"
-        & "quali_log,approval_lookup_idId,Status,"
-        & "Datum_Erstberufung_Assistant_Tra,Datum_Erstberufung_Co_Auditor,Datum_Erstberufung_Lead_Auditor"
-        & "&$top=5000",
+        & "?$top=5",
         null,
         [Implementation = "2.0"]
     ),
 
-    Umbenannt = Table.RenameColumns(Quelle, {
-        {"Auditor_LookupId",     "Auditor_SP_ID"},
-        {"Qualifikation0Id",     "Quali_SP_ID"},
-        {"approval_lookup_idId", "Approval_SP_ID"}
-    }),
-
-    Typen = Table.TransformColumnTypes(Umbenannt, {
-        {"ID",                               Int64.Type},
-        {"Auditor_SP_ID",                    Int64.Type},
-        {"Quali_SP_ID",                      Int64.Type},
-        {"Approval_SP_ID",                   Int64.Type},
-        {"Status",                           type text},
-        {"G_x00fc_ltig_ab",                  type date},
-        {"G_x00fc_ltig_bis",                 type date},
-        {"Datum_Erstberufung_Assistant_Tra", type date},
-        {"Datum_Erstberufung_Co_Auditor",    type date},
-        {"Datum_Erstberufung_Lead_Auditor",  type date},
-        {"quali_log",                        type text}
-    }),
-
-    OhneErrors = Table.ReplaceErrorValues(
-        Typen,
-        List.Transform(Table.ColumnNames(Typen), each {_, null})
-    )
+    // Nur die Spaltennamen zurückgeben – leichter zu lesen als eine volle Tabelle.
+    Spalten = Table.ColumnNames(Quelle),
+    AlsTabelle = Table.FromList(Spalten, Splitter.SplitByNothing(), {"Spaltenname"})
 in
-    OhneErrors;
+    AlsTabelle;
