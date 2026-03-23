@@ -7,7 +7,7 @@ shared approval_log = let
         "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
         & "/_api/lists/getbytitle('approval_log')/items"
         & "?$select=ID,Auditor_LookupId,Qualifikation_LookupId,Art,Datum,Kommentar,Status,"
-        & "formaleReberufung,GültigkeitderformalenReber,abweichendeDauer,Created,"
+        & "formaleReberufung,G_x00fc_ltigkeitderformalenBerufung,abweichendeDauer,Created,"
         & "Auditor_Lookup/Title,Qualifikation_Lookup/Title"
         & "&$expand=Auditor_Lookup,Qualifikation_Lookup"
         & "&$top=5000",
@@ -28,7 +28,7 @@ shared approval_log = let
         {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},
         {"formaleReberufung",          "gültig_von"},
-        {"GültigkeitderformalenReber", "gültig_bis"},
+        {"GültigkeitderformalenBerufung", "gültig_bis"},
         {"Created",                    "Erstellt"}
     }),
 
