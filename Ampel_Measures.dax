@@ -116,3 +116,28 @@ CALCULATE(
     COUNTROWS(Qualifikations_Status),
     Qualifikations_Status[Gültig_bis] > TODAY() + 90
 )
+
+
+// ------------------------------------------------------------
+// 6) Hat_Qualifikation  →  Visual-Filter gegen Phantomzeilen
+//
+// Ursache: Power BIs Auto Date/Time erzeugt eine versteckte
+// Kalendertabelle, die ALLE Datumswerte im Bereich enthält –
+// auch solche ohne echte Qualifikations_Status-Zeilen.
+// Ergebnis: leere Zeilen ohne Auditor/Berufung im Bericht.
+//
+// Lösung:
+//   a) Dieses Measure als Visual-Ebenen-Filter setzen:
+//      Hat_Qualifikation = 1
+//   b) UND in Power BI Desktop:
+//      Datei → Optionen → Aktuelle Datei → Datenladen
+//      → "Auto Datum/Uhrzeit" DEAKTIVIEREN
+//   c) Danach die neue Datum-Tabelle (aus dem Mashup) mit
+//      Qualifikations_Status[Gültig_bis] verknüpfen.
+// ------------------------------------------------------------
+Hat_Qualifikation =
+IF(
+    COUNTROWS(Qualifikations_Status) > 0,
+    1,
+    BLANK()
+)

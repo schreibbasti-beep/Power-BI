@@ -47,9 +47,11 @@ shared Qualifikations_Status = let
         Typen,
         List.Transform(Table.ColumnNames(Typen), each {_, null})
     ),
-    // Zeilen ohne Auditor-Verknüpfung herausfiltern –
+    // Zeilen ohne Auditor- oder Qualifikations-Verknüpfung herausfiltern –
     // verhindert leere Auditor/Berufung-Zeilen im Power-BI-Bericht.
-    GefilterteZeilen = Table.SelectRows(OhneErrors, each [Auditor_SP_ID] <> null),
+    GefilterteZeilen = Table.SelectRows(OhneErrors,
+        each [Auditor_SP_ID] <> null and [Quali_SP_ID] <> null
+    ),
     // "Id" (Tippfehler) und "ID" waren beide vorhanden → nur "ID" behalten.
     #"Neu angeordnete Spalten" = Table.ReorderColumns(GefilterteZeilen, {
         "ID", "Quali_SP_ID", "Auditor_SP_ID", "Gültig_ab", "Gültig_bis",

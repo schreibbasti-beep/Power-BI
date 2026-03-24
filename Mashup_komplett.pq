@@ -109,9 +109,11 @@ shared Qualifikations_Status = let
         Typen,
         List.Transform(Table.ColumnNames(Typen), each {_, null})
     ),
-    // Zeilen ohne Auditor-Verknüpfung herausfiltern –
+    // Zeilen ohne Auditor- oder Qualifikations-Verknüpfung herausfiltern –
     // verhindert leere Auditor/Berufung-Zeilen im Power-BI-Bericht.
-    GefilterteZeilen = Table.SelectRows(OhneErrors, each [Auditor_SP_ID] <> null),
+    GefilterteZeilen = Table.SelectRows(OhneErrors,
+        each [Auditor_SP_ID] <> null and [Quali_SP_ID] <> null
+    ),
     // "Id" (Tippfehler) und "ID" waren beide vorhanden → nur "ID" behalten.
     #"Neu angeordnete Spalten" = Table.ReorderColumns(GefilterteZeilen, {
         "ID", "Quali_SP_ID", "Auditor_SP_ID", "Gültig_ab", "Gültig_bis",
@@ -173,3 +175,38 @@ shared approval_log = let
     )
 in
     OhneErrors;
+
+// ============================================================
+// Datum-Tabelle (Kalenderdimension)
+//
+// Zweck: Ersetzt die automatische Auto Date/Time-Hierarchie
+//        von Power BI, die für Gültig_bis-Felder leere Zeilen
+//        (Phantomzeilen) ohne Auditor/Berufung erzeugt.
+//
+// Einrichtung in Power BI Desktop:
+//   1. Datei → Optionen → Aktuelle Datei → Datenladen
+//      → "Auto Datum/Uhrzeit" DEAKTIVIEREN
+//   2. Beziehung erstellen:
+//      Datum[Datum]  →  Qualifikations_Status[Gültig_bis]
+//      (1:n, Einzelrichtung: Datum → Qualifikations_Status)
+//   3. Im Visual: Datum[Jahr], Datum[Monat_Name], Datum[Tag]
+//      statt der alten Gültig_bis-Hierarchie verwenden.
+// ============================================================
+shared Datum = let
+    StartDatum  = #date(2015, 1, 1),
+    EndDatum    = #date(2035, 12, 31),
+    AnzahlTage  = Duration.Days(EndDatum - StartDatum) + 1,
+    Datumsliste = List.Dates(StartDatum, AnzahlTage, #duration(1, 0, 0, 0)),
+    Tabelle = Table.FromList(
+        Datumsliste,
+        Splitter.SplitByNothing(),
+        type table [Datum = date]
+    ),
+    MitJahr      = Table.AddColumn(Tabelle,     "Jahr",       each Date.Year([Datum]),                       Int64.Type),
+    MitQuartal   = Table.AddColumn(MitJahr,     "Quartal",    each "Q" & Text.From(Date.QuarterOfYear([Datum])), type text),
+    MitMonatNr   = Table.AddColumn(MitQuartal,  "Monat_Nr",   each Date.Month([Datum]),                      Int64.Type),
+    MitMonatName = Table.AddColumn(MitMonatNr,  "Monat_Name", each Date.ToText([Datum], "MMMM", "de-DE"),    type text),
+    MitTag       = Table.AddColumn(MitMonatName,"Tag",        each Date.Day([Datum]),                        Int64.Type),
+    MitWochentag = Table.AddColumn(MitTag,      "Wochentag",  each Date.ToText([Datum], "dddd", "de-DE"),    type text)
+in
+    MitWochentag;
