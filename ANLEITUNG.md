@@ -113,8 +113,6 @@ Die Aufgabenstellung verwendet den Begriff `Gültig_von` für das Startdatum des
 
 **Option B – OData.Feed via REST API (aktive Implementierung)**
 
-Alle Abfragen nutzen direkt die SharePoint REST API mit `$select`-Parametern. Das reduziert die Ladezeit erheblich, da nur benötigte Felder übertragen werden.
-
 ```m
 // Grundmuster für alle Listen:
 OData.Feed(
@@ -131,121 +129,85 @@ OData.Feed(
 
 | Besonderheit | Erklärung |
 |---|---|
-| `Implementation = "2.0"` | Aktiviert OData v4-Kompatibilität; liefert korrekte Datumstypen |
-| URL-Kodierung von Umlauten | `ü` → `_x00fc_` im internen Feldnamen; wird beim Laden automatisch dekodiert |
-| Lookup-Spalten mit `$expand` | Erfordern `$select` mit Unterfeld (z. B. `Auditor_Lookup/ID`), sonst HTTP-400-Fehler |
-| Expanded Lookups in OData v4 | Werden als **Table** (nicht Record) zurückgegeben → erste Zeile muss explizit ausgelesen werden |
-| `$top=5000` | SharePoint-Standard-Limit pro Seite; bei über 5.000 Einträgen Paginierung erforderlich |
+| `Implementation = "2.0"` | Aktiviert OData v4; liefert korrekte Datumstypen |
+| URL-Kodierung von Umlauten | `ü` → `_x00fc_` im internen Feldnamen; wird beim Laden dekodiert |
+| Lookup mit `$expand` | Erfordert `$select` mit Unterfeld (z. B. `Auditor_Lookup/ID`) |
+| Expanded Lookups OData v4 | Werden als **Table** zurückgegeben → erste Zeile explizit auslesen |
+| `$top=5000` | SharePoint-Standard-Limit; bei > 5.000 Zeilen Paginierung nötig |
 
-### 1.3 Liste 1 – Auditoren_Stammdaten
+### 1.3–1.6 Listen-Abfragen
 
-```m
-Quelle = OData.Feed(
-    "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
-    & "/_api/lists/getbytitle('Auditoren_Stammdaten')/items"
-    & "?$select=ID,Title,Nachname,Vorname,Geschlecht,Email_Adresse,Land_Name,Land_kurz,PLZ"
-    & "&$top=5000",
-    null,
-    [Implementation = "2.0"]
-)
-// Spaltenumbenennung: ID → Auditor_SP_ID | Title → Auditor_Nummer | Geschlecht → Anrede
+→ Vollständige M-Abfragen für alle vier Listen in `Mashup_komplett.pq` (alle Transformationen, Typisierungen und Fehlerbehandlungen enthalten). Einzeldateien: `Auditoren_Stammdaten.pq`, `Qualifikations_Regelwerk.pq`, `Qualifikations_Status.pq`, `approval_log.pq`.
+
+> **Häufiger Fehler bei Qualifikations_Status:** Wird `Auditor_Lookup/ID` im `$select` weggelassen, antwortet SharePoint mit HTTP 400. Das Unterfeld muss immer explizit angegeben werden.
+
+### 1.7 Datum-Hilfstabelle
+
+Vollständig in Power Query generiert (kein SharePoint-Load). Zeitraum 2015–2035, 11 Spalten. Nach dem Laden **Sortierung nach Spalte** setzen: `Monat_Name` → `Monat_Nr`, `Wochentag` → `Wochentag_Nr`.
+
+---
+
+## Schritt 2 – Datenmodell & Beziehungen
+
+### 2.1 Star-Schema-Überblick
+
+Die Tabelle `Qualifikations_Status` ist die **zentrale Faktentabelle**. Alle anderen Tabellen sind Dimensionen oder Historientabellen:
+
+```
+                ┌─────────────────────┐
+                │  Auditoren_Stammdaten │
+                │  (Dimension)          │
+                │  PK: Auditor_SP_ID    │
+                └──────────┬──────────┘
+                           │ 1:n
+  ┌───────────┐   n │       1   ┌───────────────────────┐
+  │   Datum    │◄────────╌────────►│ Qualifikations_Status │
+  │ Dimension │ Gültig_bis  (Fakt)   │ FK: Auditor_SP_ID     │
+  │ PK: Datum │              │       │ FK: Quali_SP_ID       │
+  └───────────┘              │       │ FK: Approval_SP_ID    │
+                             │       └────────┬──────────────┘
+                             │                │
+  ┌─────────────────┐   │          n:1 │
+  │ Qualifikations_    │◄──┘       ┌────────┴────────┐
+  │ Regelwerk          │           │ approval_log   │
+  │ (Dimension)        │           │ (Historie)     │
+  │ PK: Quali_SP_ID    │           │ PK: Approval_  │
+  └─────────────────┘           │     SP_ID      │
+                                   └────────────────┘
 ```
 
-→ Vollständige Abfrage inkl. Typisierung und Fehlerbehandlung: `Auditoren_Stammdaten.pq`
+### 2.2 Beziehungen konfigurieren
 
-### 1.4 Liste 2 – Qualifikations_Regelwerk
+**Start → Beziehungen verwalten → Neu** (oder per Drag & Drop in der Modellansicht)
 
-```m
-Quelle = OData.Feed(
-    "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
-    & "/_api/lists/getbytitle('Qualifikations_Regelwerk')/items"
-    & "?$select=ID,Title,Berufung_Monate,Anzahl_Monitorings,Anzahl_Audits,"
-    & "Anzahl_Stand_der_Technik_Schulun,Anzahl_ERFA"
-    & "&$top=5000",
-    null,
-    [Implementation = "2.0"]
-)
-// Spaltenumbenennung: ID → Quali_SP_ID | Title → Qualifikation_Name
-```
+| Von-Tabelle (Viele-Seite) | Von-Spalte | Zu-Tabelle (Eine-Seite) | Zu-Spalte | Kardinalität | Filterrichtung | Aktiv |
+|---|---|---|---|---|---|---|
+| `Qualifikations_Status` | `Auditor_SP_ID` | `Auditoren_Stammdaten` | `Auditor_SP_ID` | n:1 | Einfach | ✅ |
+| `Qualifikations_Status` | `Quali_SP_ID` | `Qualifikations_Regelwerk` | `Quali_SP_ID` | n:1 | Einfach | ✅ |
+| `Qualifikations_Status` | `Approval_SP_ID` | `approval_log` | `Approval_SP_ID` | n:1 | Einfach | ✅ |
+| `Qualifikations_Status` | `Gültig_bis` | `Datum` | `Datum` | n:1 | Einfach | ✅ |
 
-→ Vollständige Abfrage: `Qualifikations_Regelwerk.pq`
+> **Filterrichtung immer einfach (single):** Filter fließen von der Dimensions-Tabelle (Eine-Seite) in die Faktentabelle (Viele-Seite). Bidirektionale Filter können zu unerwartetem Verhalten bei Measures führen und sind hier nicht nötig.
 
-### 1.5 Liste 3 – Qualifikations_Status (mit Lookup-Expand)
+> **Hinweis zu `approval_log`:** Die Beziehung verbindet jeden `Qualifikations_Status`-Eintrag mit dem zugehörigen letzten Genehmigungsdatensatz. Der `approval_log` enthält die komplette Genehmigungshistorie; über `Approval_SP_ID` in `Qualifikations_Status` ist immer nur der aktuell referenzierte Eintrag verknüpft.
 
-Diese Liste enthält eine Lookup-Spalte `Auditor_Lookup`, die via `$expand` geladen werden muss:
+### 2.3 Auto Date/Time deaktivieren (Pflichtschritt)
 
-```m
-Quelle = OData.Feed(
-    "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
-    & "/_api/lists/getbytitle('Qualifikations_Status')/items"
-    & "?$select=ID,Qualifikation0Id,G_x00fc_ltig_ab,G_x00fc_ltig_bis,"
-    & "quali_log,approval_lookup_idId,Status,"
-    & "Datum_Erstberufung_Assistant_Tra,Datum_Erstberufung_Co_Auditor,"
-    & "Datum_Erstberufung_Lead_Auditor,"
-    & "Auditor_Lookup/ID"          // <-- Unterfeld zwingend angeben!
-    & "&$expand=Auditor_Lookup"
-    & "&$top=5000",
-    null,
-    [Implementation = "2.0"]
-),
-// OData v4: Auditor_Lookup kommt als Table (nicht Record)
-// → Erste Zeile auslesen; bei leerer Table = null
-MitAuditor = Table.AddColumn(
-    Quelle, "Auditor_SP_ID",
-    each let t = [Auditor_Lookup]
-         in if Table.IsEmpty(t) then null else t{0}[ID],
-    Int64.Type
-)
-```
+Power BI erstellt für jede Datumsspalte automatisch eine versteckte Kalendertabelle (Auto Date/Time). Das erzeugt **Phantomzeilen** in Visuals – leere Tabellenzeilen ohne Auditor oder Qualifikation. Da eine eigene `Datum`-Tabelle vorhanden ist, muss Auto Date/Time deaktiviert werden:
 
-> **Häufiger Fehler:** Wird `Auditor_Lookup/ID` im `$select` weggelassen, antwortet SharePoint mit HTTP 400. Das Unterfeld muss immer explizit angegeben werden.
+**Datei → Optionen und Einstellungen → Optionen → Aktuelle Datei → Datenladen**  
+→ Häkchen bei **„Auto Datum/Uhrzeit“ entfernen** → OK
 
-→ Vollständige Abfrage inkl. Filterung von Zeilen ohne Auditor/Qualifikation-Verknüpfung: `Qualifikations_Status.pq`
+Anschließend im Visual-Bereich statt der alten `Gültig_bis`-Hierarchie die Spalten der `Datum`-Tabelle verwenden: `Datum[Jahr]`, `Datum[Monat_Name]`, `Datum[Jahresmonat]` etc.
 
-### 1.6 Liste 4 – approval_log
+### 2.4 Qualifikations_Status_Korrektur als primäre Tabelle
 
-```m
-Quelle = OData.Feed(
-    "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
-    & "/_api/lists/getbytitle('approval_log')/items"
-    & "?$select=ID,Auditor_LookupId,Qualifikation_LookupId,Art,Datum,Kommentar,Status,"
-    & "formaleReberufung,G_x00fc_ltigkeitderformalenReber,abweichendeDauer,Created,"
-    & "Auditor_Lookup/Title,Qualifikation_Lookup/Title"
-    & "&$expand=Auditor_Lookup,Qualifikation_Lookup"
-    & "&$top=5000",
-    null,
-    [Implementation = "2.0"]
-)
-// Lookup-Spalten via ExpandRecordColumn auf Title-Wert reduzieren
-// Umbenennung: formaleReberufung → gültig_von | Gültig...Reber → gültig_bis
-```
+Nach Einbindung der Korrekturlogik (Schritt 3) gibt es zwei Möglichkeiten:
 
-> **Hinweis zur Feldnamenkürzung:** SharePoint begrenzt interne Feldnamen auf 32 Zeichen. `G_x00fc_ltigkeitderformalenReber` ist die gekürzte Form von „GültigkeitderformalenReberufung“. Der Feldname im Query muss exakt diesem gekürzten API-Namen entsprechen.
+**Option A – Ersetzung (empfohlen):**  
+Die Abfrage `Qualifikations_Status_Korrektur` ersetzt `Qualifikations_Status` als primäre Faktentabelle. Alle vier Beziehungen (Schritt 2.2) auf `Qualifikations_Status_Korrektur` umstellen. Die Originaltabelle `Qualifikations_Status` bleibt als Hintergrundabfrage erhalten (Laden deaktivieren).
 
-→ Vollständige Abfrage: `approval_log.pq`
+**Option B – Direktintegration:**  
+Den Merge-Schritt und die Korrekturspalten direkt in `Qualifikations_Status.pq` einfügen (nach dem letzten vorhandenen Transformationsschritt). Dann ist nur eine Tabelle nötig.
 
-### 1.7 Datum-Hilfstabelle (Kalenderdimension)
-
-Die Datum-Tabelle wird vollständig in Power Query generiert – keine SharePoint-Quelle. Sie deckt den Zeitraum 2015–2035 ab und enthält folgende Spalten:
-
-| Spalte | Typ | Verwendung |
-|---|---|---|
-| `Datum` | date | Primärschlüssel, Beziehung zu `Gültig_bis` |
-| `Jahr` | integer | Jahresfilter |
-| `Halbjahr` | text | „H1“ / „H2“ |
-| `Quartal` | text | „Q1“–„Q4“ |
-| `KW` | integer | Kalenderwoche (Montag-basiert) |
-| `Monat_Nr` | integer | Sortierspalte für `Monat_Name` |
-| `Monat_Name` | text | Ausgeschriebener Monatsname (de-DE) |
-| `Jahresmonat` | text | „2026-03“ – kompakt für Zeitachsen |
-| `Tag` | integer | Tageszahl |
-| `Wochentag` | text | Ausgeschriebener Wochentag (de-DE) |
-| `Wochentag_Nr` | integer | 1 = Mo … 7 = So (Sortierspalte für `Wochentag`) |
-
-> **Wichtig:** Nach dem Laden in Power BI Desktop müssen zwei **„Sortierung nach Spalte“**-Einstellungen gesetzt werden (im Datenbereich, Spalte auswählen → Spaltentools → Sortierung nach Spalte):
-> - `Monat_Name` → sortieren nach `Monat_Nr`
-> - `Wochentag` → sortieren nach `Wochentag_Nr`
->
-> Ohne diese Einstellung sortieren Monate und Wochentage alphabetisch (Dezember vor Februar).
-
-→ Vollständige Abfrage aller Listen inkl. Datum-Tabelle: `Mashup_komplett.pq`
+In beiden Fällen zeigen alle DAX-Measures auf die Tabelle mit den Spalten `Gültig_ab_Korrekt`, `Gültig_bis_Korrekt` und `Datum_Fehlerhaft`.
