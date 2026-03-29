@@ -137,77 +137,229 @@ OData.Feed(
 
 ### 1.3–1.6 Listen-Abfragen
 
-→ Vollständige M-Abfragen für alle vier Listen in `Mashup_komplett.pq` (alle Transformationen, Typisierungen und Fehlerbehandlungen enthalten). Einzeldateien: `Auditoren_Stammdaten.pq`, `Qualifikations_Regelwerk.pq`, `Qualifikations_Status.pq`, `approval_log.pq`.
+→ Vollständige M-Abfragen für alle vier Listen in `Mashup_komplett.pq`. Einzeldateien: `Auditoren_Stammdaten.pq`, `Qualifikations_Regelwerk.pq`, `Qualifikations_Status.pq`, `approval_log.pq`.
 
-> **Häufiger Fehler bei Qualifikations_Status:** Wird `Auditor_Lookup/ID` im `$select` weggelassen, antwortet SharePoint mit HTTP 400. Das Unterfeld muss immer explizit angegeben werden.
+> **Häufiger Fehler bei Qualifikations_Status:** Wird `Auditor_Lookup/ID` im `$select` weggelassen, antwortet SharePoint mit HTTP 400.
 
 ### 1.7 Datum-Hilfstabelle
 
-Vollständig in Power Query generiert (kein SharePoint-Load). Zeitraum 2015–2035, 11 Spalten. Nach dem Laden **Sortierung nach Spalte** setzen: `Monat_Name` → `Monat_Nr`, `Wochentag` → `Wochentag_Nr`.
+Vollständig in Power Query generiert. Zeitraum 2015–2035, 11 Spalten. Nach dem Laden **Sortierung nach Spalte** setzen: `Monat_Name` → `Monat_Nr`, `Wochentag` → `Wochentag_Nr`.
 
 ---
 
 ## Schritt 2 – Datenmodell & Beziehungen
 
-### 2.1 Star-Schema-Überblick
+### 2.1 Star-Schema
 
-Die Tabelle `Qualifikations_Status` ist die **zentrale Faktentabelle**. Alle anderen Tabellen sind Dimensionen oder Historientabellen:
-
-```
-                ┌─────────────────────┐
-                │  Auditoren_Stammdaten │
-                │  (Dimension)          │
-                │  PK: Auditor_SP_ID    │
-                └──────────┬──────────┘
-                           │ 1:n
-  ┌───────────┐   n │       1   ┌───────────────────────┐
-  │   Datum    │◄────────╌────────►│ Qualifikations_Status │
-  │ Dimension │ Gültig_bis  (Fakt)   │ FK: Auditor_SP_ID     │
-  │ PK: Datum │              │       │ FK: Quali_SP_ID       │
-  └───────────┘              │       │ FK: Approval_SP_ID    │
-                             │       └────────┬──────────────┘
-                             │                │
-  ┌─────────────────┐   │          n:1 │
-  │ Qualifikations_    │◄──┘       ┌────────┴────────┐
-  │ Regelwerk          │           │ approval_log   │
-  │ (Dimension)        │           │ (Historie)     │
-  │ PK: Quali_SP_ID    │           │ PK: Approval_  │
-  └─────────────────┘           │     SP_ID      │
-                                   └────────────────┘
-```
+Zentrale Faktentabelle: `Qualifikations_Status`. Dimensionen: `Auditoren_Stammdaten`, `Qualifikations_Regelwerk`, `Datum`. Historientabelle: `approval_log`.
 
 ### 2.2 Beziehungen konfigurieren
 
-**Start → Beziehungen verwalten → Neu** (oder per Drag & Drop in der Modellansicht)
+**Start → Beziehungen verwalten → Neu**
 
-| Von-Tabelle (Viele-Seite) | Von-Spalte | Zu-Tabelle (Eine-Seite) | Zu-Spalte | Kardinalität | Filterrichtung | Aktiv |
-|---|---|---|---|---|---|---|
-| `Qualifikations_Status` | `Auditor_SP_ID` | `Auditoren_Stammdaten` | `Auditor_SP_ID` | n:1 | Einfach | ✅ |
-| `Qualifikations_Status` | `Quali_SP_ID` | `Qualifikations_Regelwerk` | `Quali_SP_ID` | n:1 | Einfach | ✅ |
-| `Qualifikations_Status` | `Approval_SP_ID` | `approval_log` | `Approval_SP_ID` | n:1 | Einfach | ✅ |
-| `Qualifikations_Status` | `Gültig_bis` | `Datum` | `Datum` | n:1 | Einfach | ✅ |
+| Von-Tabelle | Von-Spalte | Zu-Tabelle | Zu-Spalte | Kardinalität | Filterrichtung |
+|---|---|---|---|---|---|
+| `Qualifikations_Status` | `Auditor_SP_ID` | `Auditoren_Stammdaten` | `Auditor_SP_ID` | n:1 | Einfach |
+| `Qualifikations_Status` | `Quali_SP_ID` | `Qualifikations_Regelwerk` | `Quali_SP_ID` | n:1 | Einfach |
+| `Qualifikations_Status` | `Approval_SP_ID` | `approval_log` | `Approval_SP_ID` | n:1 | Einfach |
+| `Qualifikations_Status` | `Gültig_bis` | `Datum` | `Datum` | n:1 | Einfach |
 
-> **Filterrichtung immer einfach (single):** Filter fließen von der Dimensions-Tabelle (Eine-Seite) in die Faktentabelle (Viele-Seite). Bidirektionale Filter können zu unerwartetem Verhalten bei Measures führen und sind hier nicht nötig.
+> Filterrichtung immer **einfach**: Filter fließen von der Dimensionstabelle in die Faktentabelle. Bidirektionale Filter können bei Measures zu falschem Verhalten führen.
 
-> **Hinweis zu `approval_log`:** Die Beziehung verbindet jeden `Qualifikations_Status`-Eintrag mit dem zugehörigen letzten Genehmigungsdatensatz. Der `approval_log` enthält die komplette Genehmigungshistorie; über `Approval_SP_ID` in `Qualifikations_Status` ist immer nur der aktuell referenzierte Eintrag verknüpft.
+### 2.3 Auto Date/Time deaktivieren (Pflicht)
 
-### 2.3 Auto Date/Time deaktivieren (Pflichtschritt)
+**Datei → Optionen → Aktuelle Datei → Datenladen → „Auto Datum/Uhrzeit“ deaktivieren**
 
-Power BI erstellt für jede Datumsspalte automatisch eine versteckte Kalendertabelle (Auto Date/Time). Das erzeugt **Phantomzeilen** in Visuals – leere Tabellenzeilen ohne Auditor oder Qualifikation. Da eine eigene `Datum`-Tabelle vorhanden ist, muss Auto Date/Time deaktiviert werden:
+Ohne diesen Schritt entstehen Phantomzeilen im Visual (leere Zeilen aus der versteckten Auto-Kalendertabelle).
 
-**Datei → Optionen und Einstellungen → Optionen → Aktuelle Datei → Datenladen**  
-→ Häkchen bei **„Auto Datum/Uhrzeit“ entfernen** → OK
+### 2.4 Primäre Faktentabelle mit Korrektur
 
-Anschließend im Visual-Bereich statt der alten `Gültig_bis`-Hierarchie die Spalten der `Datum`-Tabelle verwenden: `Datum[Jahr]`, `Datum[Monat_Name]`, `Datum[Jahresmonat]` etc.
+Nach Schritt 3 empfohlen: `Qualifikations_Status_Korrektur` als Faktentabelle einsetzen, alle vier Beziehungen darauf umleiten. Die Originaltabelle kann mit deaktiviertem Laden im Hintergrund bleiben.
 
-### 2.4 Qualifikations_Status_Korrektur als primäre Tabelle
+---
 
-Nach Einbindung der Korrekturlogik (Schritt 3) gibt es zwei Möglichkeiten:
+## Schritt 3 – Korrekturlogik (Power Query M)
 
-**Option A – Ersetzung (empfohlen):**  
-Die Abfrage `Qualifikations_Status_Korrektur` ersetzt `Qualifikations_Status` als primäre Faktentabelle. Alle vier Beziehungen (Schritt 2.2) auf `Qualifikations_Status_Korrektur` umstellen. Die Originaltabelle `Qualifikations_Status` bleibt als Hintergrundabfrage erhalten (Laden deaktivieren).
+### 3.1 Das Datenproblem
 
-**Option B – Direktintegration:**  
-Den Merge-Schritt und die Korrekturspalten direkt in `Qualifikations_Status.pq` einfügen (nach dem letzten vorhandenen Transformationsschritt). Dann ist nur eine Tabelle nötig.
+In `Qualifikations_Status` wurden `Gültig_ab` und `Gültig_bis` mit einem einheitlichen Datum befüllt – unabhängig vom tatsächlichen Status des Auditors. Die korrekte Laufzeit richtet sich nach dem **statusabhängigen Erstberufungsdatum**:
 
-In beiden Fällen zeigen alle DAX-Measures auf die Tabelle mit den Spalten `Gültig_ab_Korrekt`, `Gültig_bis_Korrekt` und `Datum_Fehlerhaft`.
+| Status | Korrektes Erstberufungsdatum |
+|---|---|
+| Lead-Auditor, Experte, Prüfer | `Datum_Erstberufung_Lead_Auditor` |
+| Co-Auditor | `Datum_Erstberufung_Co_Auditor` |
+| Assistant, Trainee | `Datum_Erstberufung_Assistant_Tra` |
+
+Da die Erstberufungen in der Vergangenheit liegen und Zyklen zwischenzeitlich abgelaufen sind, muss der **aktuell gültige Zyklus rollierend berechnet** werden.
+
+### 3.2 Zyklusberechnung (Kernlogik)
+
+```
+MonatsDiff  = (JahrHeute – JahrErstberufung) × 12 + (MonatHeute – MonatErstberufung)
+Zyklen      = GANZZAHL(MonatsDiff ÷ Berufung_Monate)
+Gültig_ab_Korrekt  = Erstberufung + Zyklen × Berufung_Monate
+Gültig_bis_Korrekt = Gültig_ab_Korrekt + Berufung_Monate
+```
+
+**Taggenauer Kantfall:** Wenn der berechnete Startkandidat noch in der Zukunft liegt (d. h. der Tag im aktuellen Monat ist noch nicht erreicht), wird `Zyklen – 1` verwendet.
+
+**Beispiel:** Erstberufung = 2018-01-15 · Berufung_Monate = 36 · Heute = 2026-03-25  
+→ MonatsDiff = 98 · Zyklen = 2 · **Gültig_ab = 2024-01-15 · Gültig_bis = 2027-01-15**
+
+### 3.3 Neue Spalten
+
+| Spalte | Typ | Bedeutung |
+|---|---|---|
+| `Erstberufung_Korrekt` | date | Statusabhängig ermitteltes Erstberufungsdatum |
+| `Berufung_Monate` | integer | Zykluslänge aus `Qualifikations_Regelwerk` (via Left Join) |
+| `Gültig_ab_Korrekt` | date | Start des aktuellen Zyklus |
+| `Gültig_bis_Korrekt` | date | Ende des aktuellen Zyklus |
+| `Datum_Fehlerhaft` | logical | `true` = Ist ≠ Soll · `false` = OK · `null` = nicht prüfbar |
+
+→ **Vollständige M-Implementierung:** `Qualifikations_Status_Korrektur.pq`
+
+### 3.4 Einbindung in Power BI Desktop
+
+1. `Qualifikations_Status_Korrektur.pq` öffnen → Inhalt in den Power Query-Editor kopieren
+2. Im Editor: **Start → Neue Quelle → Leere Abfrage → Erweiterter Editor**
+3. Code einfügen → Fertig → Abfrage in `Qualifikations_Status_Korrektur` umbenennen
+4. Beziehungen aus Schritt 2.2 auf diese Tabelle umleiten (Schritt 2.4)
+5. Originaltabelle `Qualifikations_Status`: Rechtsklick → **„Laden deaktivieren“**
+
+---
+
+## Schritt 4 – DAX-Formeln
+
+> Alle Formeln sind in `Ampel_Measures_v2.dax` und `Datenqualitaet_Measures.dax` vollständig kommentiert. Dieser Abschnitt fasst die wichtigsten Formeln zusammen und erklärt die Einrichtung.
+
+### 4.1 Berechnete Spalten vs. Measures
+
+| Typ | Wann verwenden | Besonderheit |
+|---|---|---|
+| **Berechnete Spalte** | Slicer, bedingte Formatierung nach Feldwert, Sortierung | Wird einmalig beim Refresh berechnet; `TODAY()` = Refresh-Zeitpunkt |
+| **Measure** | KPI-Karten, aggregierte Werte, dynamische Berechnungen | Wird zur Laufzeit im Filterkontext ausgewertet |
+
+### 4.2 Berechnete Spalten anlegen
+
+**Modellierung → Neue Spalte** (Tabelle `Qualifikations_Status` auswählen)
+
+**Tage_bis_Ablauf** – verbleibende Tage (negativ = abgelaufen):
+
+```dax
+Tage_bis_Ablauf =
+DATEDIFF(
+    TODAY(),
+    Qualifikations_Status[Gültig_bis_Korrekt],
+    DAY
+)
+```
+
+**Ampel_Farbe** – für Slicer und bedingte Formatierung:
+
+```dax
+Ampel_Farbe =
+VAR Tage = Qualifikations_Status[Tage_bis_Ablauf]
+RETURN
+    IF(
+        ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt]),
+        "⚪ Kein Datum",
+        IF(Tage <= 30,  "🔴 Rot",
+        IF(Tage <= 60,  "🟡 Gelb",
+        IF(Tage <= 90,  "🟠 Orange",
+                        "🟢 Grün")))
+    )
+```
+
+> **Wichtig:** `Ampel_Farbe` – **Sortierung nach Spalte** → `Ampel_Sortierung` setzen, damit Rot im Slicer und Visual immer oben erscheint.
+
+**Ampel_Sortierung** – Sortierspalte (1 = Rot, 5 = kein Datum):
+
+```dax
+Ampel_Sortierung =
+VAR Tage = Qualifikations_Status[Tage_bis_Ablauf]
+RETURN
+    IF(ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt]), 5,
+    IF(Tage <= 30,  1,
+    IF(Tage <= 60,  2,
+    IF(Tage <= 90,  3,
+                    4))))
+```
+
+**Dringlichkeits_Bucket** – für Slicer mit klar lesbaren Stufen:
+
+```dax
+Dringlichkeits_Bucket =
+VAR Tage = Qualifikations_Status[Tage_bis_Ablauf]
+RETURN
+    IF(ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt]), "Kein Datum",
+    IF(Tage <  0,   "Abgelaufen",
+    IF(Tage <= 30,  "≤ 30 Tage",
+    IF(Tage <= 60,  "31–60 Tage",
+    IF(Tage <= 90,  "61–90 Tage",
+                    "> 90 Tage (OK)")))))
+```
+
+### 4.3 Measures anlegen
+
+**Modellierung → Neues Measure** (Tabelle `Qualifikations_Status` auswählen)
+
+**KPI-Zählmeasures** (jeweils eine Karte pro Ampelfarbe):
+
+```dax
+Anzahl_Rot =
+CALCULATE(
+    COUNTROWS(Qualifikations_Status),
+    NOT ISBLANK(Qualifikations_Status[Tage_bis_Ablauf]),
+    Qualifikations_Status[Tage_bis_Ablauf] <= 30
+)
+
+Anzahl_Gelb    = CALCULATE(COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Tage_bis_Ablauf] >= 31,
+    Qualifikations_Status[Tage_bis_Ablauf] <= 60)
+
+Anzahl_Orange  = CALCULATE(COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Tage_bis_Ablauf] >= 61,
+    Qualifikations_Status[Tage_bis_Ablauf] <= 90)
+
+Anzahl_Gruen   = CALCULATE(COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Tage_bis_Ablauf] > 90)
+```
+
+**Ampel_Farbe_HEX** – Hexfarbcode für bedingte Formatierung per Feldwert:
+
+```dax
+Ampel_Farbe_HEX =
+VAR Tage = [Tage_bis_Ablauf_M]
+RETURN
+    IF(ISBLANK(Tage),  "#808080",
+    IF(Tage <= 30,     "#C00000",
+    IF(Tage <= 60,     "#FFD700",
+    IF(Tage <= 90,     "#FF8C00",
+                       "#00B050"))))
+```
+
+**Datenqualitäts-Measures** (für Seite 3):
+
+```dax
+Anzahl_Datum_Fehlerhaft =
+CALCULATE(
+    COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Datum_Fehlerhaft] = TRUE()
+)
+
+Anteil_Fehlerhaft_Prozent =
+VAR Pruefbar = CALCULATE(COUNTROWS(Qualifikations_Status),
+    NOT ISBLANK(Qualifikations_Status[Datum_Fehlerhaft]))
+RETURN
+    DIVIDE([Anzahl_Datum_Fehlerhaft], Pruefbar, 0)
+
+Datenqualitaet_Ampel =
+VAR Anteil = [Anteil_Fehlerhaft_Prozent]
+RETURN
+    IF(Anteil = 0,       "✅ Keine Fehler",
+    IF(Anteil < 0.05,    "🟢 Gut (< 5%)",
+    IF(Anteil < 0.20,    "🟡 Prüfen (5–20%)",
+                         "🔴 Kritisch (> 20%)")))
+```
+
+→ Sämtliche Measures mit vollständiger Dokumentation: `Ampel_Measures_v2.dax` und `Datenqualitaet_Measures.dax`
