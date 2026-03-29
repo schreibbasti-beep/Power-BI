@@ -36,7 +36,7 @@ Das Dashboard zeigt auf einen Blick, welche Auditor-Qualifikationen ablaufen ode
 | **QM / Compliance** | Vollständigkeit, Regelkonformität, Datenqualität prüfen | Seite 3 – Datenqualität |
 | **Geschäftsführung** | Aggregierte Risikoübersicht, KPIs | Seite 1 (gefiltert nach Land/Region) |
 
-> **Hinweis zu Row-Level Security:** Ob Auditoren nur ihre eigenen Daten sehen sollen, kann über RLS gesteuert werden – ohne RLS sind alle Seiten durch manuelle Slicer-Auswahl bedienbar. Siehe [Schritt 8](#schritt-8--row-level-security-hinweis).
+> **Hinweis zu Row-Level Security:** Ohne RLS sind alle Seiten durch manuelle Slicer-Auswahl bedienbar. Siehe [Schritt 8](#schritt-8--row-level-security-hinweis).
 
 ### 1.2 Ampellogik
 
@@ -48,18 +48,15 @@ Das Dashboard zeigt auf einen Blick, welche Auditor-Qualifikationen ablaufen ode
 | 🟢 **Grün** | Gültig für mehr als 90 Tage | > 90 |
 | ⚪ **Grau** | Kein `Gültig_bis_Korrekt` gesetzt | – |
 
-### 1.3 Dateienübersicht (dieses Repository)
+### 1.3 Dateienübersicht
 
 | Datei | Inhalt |
 |---|---|
-| `Mashup_komplett.pq` | Alle 4 SharePoint-Listen + vollständige Kalenderdimension |
+| `Mashup_komplett.pq` | Alle 4 SharePoint-Listen + Kalenderdimension |
 | `Qualifikations_Status_Korrektur.pq` | Korrekturlogik: statusabhängige Erstberufung + rollierender Zyklus |
-| `Ampel_Measures_v2.dax` | 4-Farben-Ampel, KPI-Counts, HEX-Farben, Sortierung |
-| `Datenqualitaet_Measures.dax` | Fehleranzahl, Fehleranteil, Abweichung, Gesamtampel |
-| `Auditoren_Stammdaten.pq` | Einzelabfrage Liste 1 |
-| `Qualifikations_Regelwerk.pq` | Einzelabfrage Liste 2 |
-| `Qualifikations_Status.pq` | Einzelabfrage Liste 3 (Basis ohne Korrektur) |
-| `approval_log.pq` | Einzelabfrage Liste 4 |
+| `Ampel_Measures_v2.dax` | 4-Farben-Ampel, KPI-Counts, HEX-Farben |
+| `Datenqualitaet_Measures.dax` | Fehleranzahl, Fehleranteil, Gesamtampel |
+| `Auditoren_Stammdaten.pq` / `Qualifikations_Regelwerk.pq` / `Qualifikations_Status.pq` / `approval_log.pq` | Einzelabfragen |
 
 ---
 
@@ -69,59 +66,46 @@ Das Dashboard zeigt auf einen Blick, welche Auditor-Qualifikationen ablaufen ode
 
 - **Power BI Desktop** – aktuellste Version (min. Release 2024-05)
 - **Power BI Pro-Lizenz** – für Veröffentlichung, Sharing und geplante Aktualisierung
-- **SharePoint Online-Zugriff** – mind. Leserechte auf alle vier Listen der Site `TeamCyber_Innovation`
+- **SharePoint Online-Zugriff** – mind. Leserechte auf alle vier Listen
 - **Power Automate** (optional) – für Near-Realtime-Refresh-Trigger
 
-### 2.2 Pro-Lizenz: relevante Limits & Möglichkeiten
+### 2.2 Pro-Lizenz: relevante Limits
 
-| Feature | Pro-Limit | Bemerkung |
+| Feature | Limit | Bemerkung |
 |---|---|---|
-| Max. Datensatzgröße | 1 GB (komprimiert) | Für SharePoint-Listen mit < 50.000 Zeilen unkritisch |
+| Max. Datensatzgröße | 1 GB | Unkritisch für SharePoint-Listen |
 | Geplante Aktualisierungen | **bis zu 8× täglich** | ≈ alle 3 Stunden |
-| Row-Level Security | ✅ vollständig unterstützt | Konfiguration im Service |
-| DirectQuery mit SharePoint | ⚠️ möglich, nicht empfohlen | Siehe Schritt 7 |
-| Sharing | Nur mit Pro-Lizenzinhabern | Oder via Einbettung in Teams/SharePoint |
+| Row-Level Security | ✅ vollständig | Konfiguration im Service |
+| DirectQuery SharePoint | ⚠️ nicht empfohlen | Siehe Schritt 7 |
 
-### 2.3 SharePoint-Listen im Überblick
+### 2.3 SharePoint-Listen
 
-| Liste | Funktion | Verknüpfungsschlüssel |
-|---|---|---|
-| `Auditoren_Stammdaten` | Stammdaten der Auditoren | `ID` → `Auditor_SP_ID` |
-| `Qualifikations_Regelwerk` | Berufungszyklen & Mindestanforderungen je Qualifikation | `ID` → `Quali_SP_ID` |
-| `Qualifikations_Status` | Qualifikationsstatus je Auditor-Qualifikation-Kombination | `ID` (Faktentabelle) |
-| `approval_log` | Historie formaler Berufungen und Genehmigungen | `ID` → `Approval_SP_ID` |
+| Liste | Verknüpfungsschlüssel |
+|---|---|
+| `Auditoren_Stammdaten` | `ID` → `Auditor_SP_ID` |
+| `Qualifikations_Regelwerk` | `ID` → `Quali_SP_ID` |
+| `Qualifikations_Status` | Faktentabelle |
+| `approval_log` | `ID` → `Approval_SP_ID` |
 
 ### 2.4 Feldbenennung: `Gültig_ab` vs. `Gültig_von`
 
-Die Aufgabenstellung verwendet den Begriff `Gültig_von` für das Startdatum des Berufungszeitraums. Im tatsächlichen SharePoint-Feld lautet der interne API-Name `G_x00fc_ltig_ab` (OData-kodiert), der von Power BI beim Laden automatisch zu **`Gültig_ab`** dekodiert wird. Die Korrekturlogik und DAX-Formeln verwenden durchgehend `Gültig_ab` / `Gültig_ab_Korrekt`.
+SharePoint-interner Feldname: `G_x00fc_ltig_ab` (OData). Nach dem Laden automatisch dekodiert zu `Gültig_ab`. Alle Formeln und Abfragen verwenden `Gültig_ab`.
 
 ---
 
 ## Schritt 1 – SharePoint-Datenanbindung
 
-### 1.1 Connector-Einrichtung in Power BI Desktop
+### 1.1 Connector-Einrichtung
 
-**Option A – Eingebauter SharePoint-Connector (für Einstieg)**
+**Option A – Eingebauter Connector:** Start → Daten abrufen → SharePoint Online-Liste → Site-URL → Organisationskonto. Nachteil: lädt viele Metadaten-Spalten mit.
 
-1. **Start → Daten abrufen → Mehr…**
-2. Suche: `SharePoint` → **SharePoint Online-Liste** → Verbinden
-3. URL eingeben: `https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation`
-4. Authentifizierung: **Organisationskonto** → Mit DEKRA-Konto anmelden
-5. Im Navigator alle vier Listen auswählen → **Daten transformieren**
-
-> **Nachteil:** Der eingebaute Connector lädt Dutzende interne SharePoint-Metadaten-Spalten mit. Die unten beschriebene OData.Feed-Methode (Option B) ist effizienter und bereits in allen `.pq`-Dateien dieses Repositories implementiert.
-
-**Option B – OData.Feed via REST API (aktive Implementierung)**
+**Option B – OData.Feed (aktive Implementierung):**
 
 ```m
-// Grundmuster für alle Listen:
 OData.Feed(
     "https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation"
-    & "/_api/lists/getbytitle('{Listenname}')/items"
-    & "?$select=Feld1,Feld2,..."
-    & "&$top=5000",
-    null,
-    [Implementation = "2.0"]   // OData v4 – wichtig für korrekte Typen
+    & "/_api/lists/getbytitle('{Liste}')/items?$select=...&$top=5000",
+    null, [Implementation = "2.0"]
 )
 ```
 
@@ -129,237 +113,222 @@ OData.Feed(
 
 | Besonderheit | Erklärung |
 |---|---|
-| `Implementation = "2.0"` | Aktiviert OData v4; liefert korrekte Datumstypen |
-| URL-Kodierung von Umlauten | `ü` → `_x00fc_` im internen Feldnamen; wird beim Laden dekodiert |
-| Lookup mit `$expand` | Erfordert `$select` mit Unterfeld (z. B. `Auditor_Lookup/ID`) |
-| Expanded Lookups OData v4 | Werden als **Table** zurückgegeben → erste Zeile explizit auslesen |
-| `$top=5000` | SharePoint-Standard-Limit; bei > 5.000 Zeilen Paginierung nötig |
+| `Implementation = "2.0"` | OData v4, korrekte Datumstypen |
+| Umlaut-Kodierung | `ü` → `_x00fc_`; wird beim Laden dekodiert |
+| Lookup + `$expand` | `$select` muss Unterfeld enthalten (z. B. `Auditor_Lookup/ID`) |
+| OData v4 Lookups | Werden als **Table** zurückgegeben → erste Zeile auslesen |
 
-### 1.3–1.6 Listen-Abfragen
-
-→ Vollständige M-Abfragen für alle vier Listen in `Mashup_komplett.pq`. Einzeldateien: `Auditoren_Stammdaten.pq`, `Qualifikations_Regelwerk.pq`, `Qualifikations_Status.pq`, `approval_log.pq`.
-
-> **Häufiger Fehler bei Qualifikations_Status:** Wird `Auditor_Lookup/ID` im `$select` weggelassen, antwortet SharePoint mit HTTP 400.
-
-### 1.7 Datum-Hilfstabelle
-
-Vollständig in Power Query generiert. Zeitraum 2015–2035, 11 Spalten. Nach dem Laden **Sortierung nach Spalte** setzen: `Monat_Name` → `Monat_Nr`, `Wochentag` → `Wochentag_Nr`.
+→ Vollständige Abfragen in `Mashup_komplett.pq`. Datum-Tabelle: 11 Spalten, 2015–2035. Nach dem Laden `Monat_Name` → nach `Monat_Nr` und `Wochentag` → nach `Wochentag_Nr` sortieren.
 
 ---
 
 ## Schritt 2 – Datenmodell & Beziehungen
 
-### 2.1 Star-Schema
+Zentrale Faktentabelle: `Qualifikations_Status`. Beziehungen:
 
-Zentrale Faktentabelle: `Qualifikations_Status`. Dimensionen: `Auditoren_Stammdaten`, `Qualifikations_Regelwerk`, `Datum`. Historientabelle: `approval_log`.
+| Von | Zu | Typ |
+|---|---|---|
+| `Qualifikations_Status[Auditor_SP_ID]` | `Auditoren_Stammdaten[Auditor_SP_ID]` | n:1, einfach |
+| `Qualifikations_Status[Quali_SP_ID]` | `Qualifikations_Regelwerk[Quali_SP_ID]` | n:1, einfach |
+| `Qualifikations_Status[Approval_SP_ID]` | `approval_log[Approval_SP_ID]` | n:1, einfach |
+| `Qualifikations_Status[Gültig_bis]` | `Datum[Datum]` | n:1, einfach |
 
-### 2.2 Beziehungen konfigurieren
-
-**Start → Beziehungen verwalten → Neu**
-
-| Von-Tabelle | Von-Spalte | Zu-Tabelle | Zu-Spalte | Kardinalität | Filterrichtung |
-|---|---|---|---|---|---|
-| `Qualifikations_Status` | `Auditor_SP_ID` | `Auditoren_Stammdaten` | `Auditor_SP_ID` | n:1 | Einfach |
-| `Qualifikations_Status` | `Quali_SP_ID` | `Qualifikations_Regelwerk` | `Quali_SP_ID` | n:1 | Einfach |
-| `Qualifikations_Status` | `Approval_SP_ID` | `approval_log` | `Approval_SP_ID` | n:1 | Einfach |
-| `Qualifikations_Status` | `Gültig_bis` | `Datum` | `Datum` | n:1 | Einfach |
-
-> Filterrichtung immer **einfach**: Filter fließen von der Dimensionstabelle in die Faktentabelle. Bidirektionale Filter können bei Measures zu falschem Verhalten führen.
-
-### 2.3 Auto Date/Time deaktivieren (Pflicht)
-
-**Datei → Optionen → Aktuelle Datei → Datenladen → „Auto Datum/Uhrzeit“ deaktivieren**
-
-Ohne diesen Schritt entstehen Phantomzeilen im Visual (leere Zeilen aus der versteckten Auto-Kalendertabelle).
-
-### 2.4 Primäre Faktentabelle mit Korrektur
-
-Nach Schritt 3 empfohlen: `Qualifikations_Status_Korrektur` als Faktentabelle einsetzen, alle vier Beziehungen darauf umleiten. Die Originaltabelle kann mit deaktiviertem Laden im Hintergrund bleiben.
+**Pflicht:** Auto Date/Time deaktivieren – Datei → Optionen → Aktuelle Datei → Datenladen.
 
 ---
 
 ## Schritt 3 – Korrekturlogik (Power Query M)
 
-### 3.1 Das Datenproblem
+Fehler: `Gültig_ab` / `Gültig_bis` wurden mit einheitlichem Datum befüllt statt statusabhängigem Erstberufungsdatum.
 
-In `Qualifikations_Status` wurden `Gültig_ab` und `Gültig_bis` mit einem einheitlichen Datum befüllt – unabhängig vom tatsächlichen Status des Auditors. Die korrekte Laufzeit richtet sich nach dem **statusabhängigen Erstberufungsdatum**:
+**Statuszuordnung:**
 
-| Status | Korrektes Erstberufungsdatum |
+| Status | Erstberufungsfeld |
 |---|---|
 | Lead-Auditor, Experte, Prüfer | `Datum_Erstberufung_Lead_Auditor` |
 | Co-Auditor | `Datum_Erstberufung_Co_Auditor` |
 | Assistant, Trainee | `Datum_Erstberufung_Assistant_Tra` |
 
-Da die Erstberufungen in der Vergangenheit liegen und Zyklen zwischenzeitlich abgelaufen sind, muss der **aktuell gültige Zyklus rollierend berechnet** werden.
+**Zyklusformel:** `Gültig_ab_Korrekt = Erstberufung + GANZZAHL(MonatsDiff / Berufung_Monate) * Berufung_Monate`
 
-### 3.2 Zyklusberechnung (Kernlogik)
+Beispiel: Erstberufung 2018-01-15 · 36 Monate · Heute 2026-03-25 → Gültig_ab = 2024-01-15 · Gültig_bis = 2027-01-15
 
-```
-MonatsDiff  = (JahrHeute – JahrErstberufung) × 12 + (MonatHeute – MonatErstberufung)
-Zyklen      = GANZZAHL(MonatsDiff ÷ Berufung_Monate)
-Gültig_ab_Korrekt  = Erstberufung + Zyklen × Berufung_Monate
-Gültig_bis_Korrekt = Gültig_ab_Korrekt + Berufung_Monate
-```
-
-**Taggenauer Kantfall:** Wenn der berechnete Startkandidat noch in der Zukunft liegt (d. h. der Tag im aktuellen Monat ist noch nicht erreicht), wird `Zyklen – 1` verwendet.
-
-**Beispiel:** Erstberufung = 2018-01-15 · Berufung_Monate = 36 · Heute = 2026-03-25  
-→ MonatsDiff = 98 · Zyklen = 2 · **Gültig_ab = 2024-01-15 · Gültig_bis = 2027-01-15**
-
-### 3.3 Neue Spalten
-
-| Spalte | Typ | Bedeutung |
-|---|---|---|
-| `Erstberufung_Korrekt` | date | Statusabhängig ermitteltes Erstberufungsdatum |
-| `Berufung_Monate` | integer | Zykluslänge aus `Qualifikations_Regelwerk` (via Left Join) |
-| `Gültig_ab_Korrekt` | date | Start des aktuellen Zyklus |
-| `Gültig_bis_Korrekt` | date | Ende des aktuellen Zyklus |
-| `Datum_Fehlerhaft` | logical | `true` = Ist ≠ Soll · `false` = OK · `null` = nicht prüfbar |
-
-→ **Vollständige M-Implementierung:** `Qualifikations_Status_Korrektur.pq`
-
-### 3.4 Einbindung in Power BI Desktop
-
-1. `Qualifikations_Status_Korrektur.pq` öffnen → Inhalt in den Power Query-Editor kopieren
-2. Im Editor: **Start → Neue Quelle → Leere Abfrage → Erweiterter Editor**
-3. Code einfügen → Fertig → Abfrage in `Qualifikations_Status_Korrektur` umbenennen
-4. Beziehungen aus Schritt 2.2 auf diese Tabelle umleiten (Schritt 2.4)
-5. Originaltabelle `Qualifikations_Status`: Rechtsklick → **„Laden deaktivieren“**
+→ **Vollständig implementiert in** `Qualifikations_Status_Korrektur.pq`
 
 ---
 
 ## Schritt 4 – DAX-Formeln
 
-> Alle Formeln sind in `Ampel_Measures_v2.dax` und `Datenqualitaet_Measures.dax` vollständig kommentiert. Dieser Abschnitt fasst die wichtigsten Formeln zusammen und erklärt die Einrichtung.
+**Berechnete Spalten** (Modellierung → Neue Spalte):
+- `Tage_bis_Ablauf` = `DATEDIFF(TODAY(), [Gültig_bis_Korrekt], DAY)`
+- `Ampel_Farbe` = Emoji-Text („🔴 Rot“ etc.) – nach `Ampel_Sortierung` sortieren
+- `Dringlichkeits_Bucket` = „Abgelaufen“ / „≤ 30 Tage“ / „31–60 Tage“ / „61–90 Tage“ / „> 90 Tage (OK)“
 
-### 4.1 Berechnete Spalten vs. Measures
+**Measures** (Modellierung → Neues Measure):
+- `Anzahl_Rot/Gelb/Orange/Gruen` = CALCULATE/COUNTROWS mit Tage-Schwellen
+- `Ampel_Farbe_HEX` = Hexfarbcode für bedingte Formatierung
+- `Anzahl_Datum_Fehlerhaft`, `Anteil_Fehlerhaft_Prozent`, `Datenqualitaet_Ampel`
 
-| Typ | Wann verwenden | Besonderheit |
+→ Vollständig in `Ampel_Measures_v2.dax` und `Datenqualitaet_Measures.dax`
+
+---
+
+## Schritt 5 – Dashboard-Visualisierung
+
+### 5.1 Seitenstruktur
+
+| Seite | Name | Primäre Zielgruppe | Besonderheit |
+|---|---|---|---|
+| 1 | Gesamtübersicht | Auditmanager, Geschäftsführung | KPI-Leiste + Haupttabelle + Dringlichkeitsdiagramm |
+| 2 | Eigenansicht | Auditoren | Identisch zu Seite 1, aber Slicer auf eigenen Namen vorausgefüllt |
+| 3 | Datenqualität | QM / Compliance | Fehler-KPI + Ist-Soll-Vergleichstabelle |
+
+### 5.2 Seite 1 – Gesamtübersicht
+
+#### Kopfzeile: 4 KPI-Karten nebeneinander
+
+| Karte | Measure | Hintergrundfarbe | Schriftfarbe |
+|---|---|---|---|
+| Rot | `Anzahl_Rot` | `#C00000` | Weiß |
+| Gelb | `Anzahl_Gelb` | `#FFD700` | Schwarz |
+| Orange | `Anzahl_Orange` | `#FF8C00` | Schwarz |
+| Grün | `Anzahl_Gruen` | `#00B050` | Weiß |
+
+**Visual:** Karte (Card) oder Neue Karte (New Card Visual)  
+**Einrichtung:** Format → Hintergrund → Farbe auf den jeweiligen Hex-Wert setzen
+
+#### Haupttabelle mit Ampelfarben
+
+**Visual:** Tabellenvisual oder Matrixvisual
+
+**Empfohlene Spalten:**
+
+| Spalte | Quelle |
+|---|---|
+| Nachname | `Auditoren_Stammdaten[Nachname]` |
+| Vorname | `Auditoren_Stammdaten[Vorname]` |
+| Qualifikation | `Qualifikations_Regelwerk[Qualifikation_Name]` |
+| Status | `Qualifikations_Status[Status]` |
+| Gültig bis (Soll) | `Qualifikations_Status[Gültig_bis_Korrekt]` |
+| Tage bis Ablauf | Measure `Tage_bis_Ablauf_M` |
+| Ampel | Measure `Ampel_Symbol_M` |
+
+**Bedingte Formatierung einrichten – Methode A (empfohlen):**
+
+1. Spalte `Tage bis Ablauf` im Visual auswählen
+2. Format → **Zellenelement → Hintergrundfarbe** → aktivieren
+3. Formatierungsart: **Feldwert** → Measure `Ampel_Farbe_HEX` auswählen
+4. → Jede Zelle erhält automatisch die passende Ampelfarbe
+
+**Methode B – Regelbasiert (kein extra Measure):**
+
+1. Spalte auswählen → Hintergrundfarbe → **Regeln**
+2. Basierend auf Feldwert `Tage_bis_Ablauf` (berechnete Spalte):
+
+| Regel | Wenn Wert | bis | Farbe |
+|---|---|---|---|
+| Rot | ≤ | 30 | `#C00000` |
+| Gelb | > 30 und ≤ | 60 | `#FFD700` |
+| Orange | > 60 und ≤ | 90 | `#FF8C00` |
+| Grün | > | 90 | `#00B050` |
+
+**Tabelle nach Dringlichkeit sortieren:**
+Spalte `Tage bis Ablauf` → aufsteigend sortieren (kleinste/negativste Werte oben – höchste Dringlichkeit).
+
+**Visual-Filter gegen Phantomzeilen:**  
+Visual-Ebenen-Filter hinzufügen: Measure `Hat_Qualifikation` = 1
+
+#### Dringlichkeitsdiagramm
+
+**Visual:** Gestapeltes Balkendiagramm
+- Y-Achse: `Auditoren_Stammdaten[Nachname]`
+- X-Achse: `Anzahl_Gesamt` (Measure)
+- Legende: `Qualifikations_Status[Ampel_Farbe]` (berechnete Spalte)
+- Farben im Format-Bereich manuell auf die Ampelfarben setzen
+- Sortierung: nach `Anzahl_Rot` absteigend
+
+### 5.3 Seite 2 – Auditor-Eigenansicht
+
+Identischer Aufbau wie Seite 1, zusätzlich:
+- **Slicer Nachname** vorausgefüllt (oder via RLS automatisch gefiltert)
+- **Zeitlinie:** X-Achse `Datum[Jahresmonat]`, Y-Achse `Tage_bis_Ablauf_M` – zeigt den zeitlichen Verlauf der eigenen Qualifikations-Fälligkeiten
+- **Karte „nächste Fälligkeit“:** Measure `Frühestes_Ablaufdatum`
+
+### 5.4 Seite 3 – Datenqualität
+
+#### KPI-Karten oben
+
+| Karte | Measure | Hintergrund (bedingt) |
 |---|---|---|
-| **Berechnete Spalte** | Slicer, bedingte Formatierung nach Feldwert, Sortierung | Wird einmalig beim Refresh berechnet; `TODAY()` = Refresh-Zeitpunkt |
-| **Measure** | KPI-Karten, aggregierte Werte, dynamische Berechnungen | Wird zur Laufzeit im Filterkontext ausgewertet |
+| Fehlerhafte Einträge | `Anzahl_Datum_Fehlerhaft` | Rot wenn > 0 |
+| Fehleranteil | `Anteil_Fehlerhaft_Prozent` | Als % formatieren |
+| Gesamtbewertung | `Datenqualitaet_Ampel` | Kein Hintergrund |
 
-### 4.2 Berechnete Spalten anlegen
+#### Ist-Soll-Vergleichstabelle
 
-**Modellierung → Neue Spalte** (Tabelle `Qualifikations_Status` auswählen)
+**Visual:** Tabellenvisual mit **Visual-Filter: `Datum_Fehlerhaft = TRUE`**
 
-**Tage_bis_Ablauf** – verbleibende Tage (negativ = abgelaufen):
+| Spalte | Quelle |
+|---|---|
+| Nachname | `Auditoren_Stammdaten[Nachname]` |
+| Vorname | `Auditoren_Stammdaten[Vorname]` |
+| Qualifikation | `Qualifikations_Regelwerk[Qualifikation_Name]` |
+| Status | `Qualifikations_Status[Status]` |
+| Erstberufung | `Qualifikations_Status[Erstberufung_Korrekt]` |
+| Gültig ab (Ist) | `Qualifikations_Status[Gültig_ab]` |
+| Gültig ab (Soll) | `Qualifikations_Status[Gültig_ab_Korrekt]` |
+| Gültig bis (Ist) | `Qualifikations_Status[Gültig_bis]` |
+| Gültig bis (Soll) | `Qualifikations_Status[Gültig_bis_Korrekt]` |
 
-```dax
-Tage_bis_Ablauf =
-DATEDIFF(
-    TODAY(),
-    Qualifikations_Status[Gültig_bis_Korrekt],
-    DAY
-)
+**Bedingte Formatierung der Ist-Spalten:**  
+Spalten `Gültig ab (Ist)` und `Gültig bis (Ist)` → Hintergrundfarbe → Feldwert → Measure `Hat_Datumsfehler_Auditor` → Farbe `#C00000` (setzt alle Ist-Zellen rot, wenn fehlerhaft)
+
+**Export-Button:**  
+Visualization → Tabellenvisual auswählen → `...` → Daten exportieren → CSV – liefert QM/Compliance eine bereinigte Fehlerliste für die manuelle Korrektur in SharePoint.
+
+---
+
+## Schritt 6 – Slicer & Filter
+
+### 6.1 Empfohlene Slicer (alle Seiten)
+
+| Slicer | Feld | Visual-Typ | Zielgruppe |
+|---|---|---|---|
+| Auditor | `Auditoren_Stammdaten[Nachname]` | Dropdown | Alle (Eigenansicht: vorausgefüllt) |
+| Qualifikationstyp | `Qualifikations_Regelwerk[Qualifikation_Name]` | Dropdown | Alle |
+| Dringlichkeitsstufe | `Qualifikations_Status[Dringlichkeits_Bucket]` | Kachel / Liste | Alle |
+| Ampelfarbe | `Qualifikations_Status[Ampel_Farbe]` | Kachel | Alle |
+| Status | `Qualifikations_Status[Status]` | Dropdown | Auditmanager, QM |
+| Jahr | `Datum[Jahr]` | Dropdown | Alle |
+| Land | `Auditoren_Stammdaten[Land_Name]` | Dropdown | Management |
+
+### 6.2 Slicer-Synchronisation (seitenübergreifend)
+
+**Ansicht → Slicer synchronisieren**
+
+Alle Slicer (Auditor, Qualifikationstyp, Dringlichkeitsstufe) auf allen Berichtsseiten synchronisieren. Damit wirkt eine Änderung auf Seite 1 auch auf Seite 2 und 3.
+
+### 6.3 Rollenperspektive ohne RLS (via Lesezeichen)
+
+Für eine einfache Rollenperspektive ohne RLS: Lesezeichen (Bookmarks) für vorkonfigurierte Slicer-Zustände anlegen.
+
+**Einrichtung:**
+1. Slicer auf gewünschten Zustand einstellen (z. B. Dringlichkeitsstufe = „Abgelaufen“ + „≤ 30 Tage“)
+2. **Ansicht → Lesezeichen → Lesezeichen hinzufügen** → Name: `Kritische Fälle`
+3. Schaltfläche (Button-Visual) auf der Seite platzieren → **Format → Aktion → Typ: Lesezeichen → Lesezeichen auswählen**
+4. Weitere Schaltflächen für `Team-Übersicht`, `Nur Grün`, `Zurücksetzen` anlegen
+
+Empfohlene Lesezeichen-Schaltflächen-Leiste (oberer Rand des Dashboards):
+
+```
+[ Alle anzeigen ]  [ 🔴 Kritisch ]  [ 🟡 In Kürze ]  [ 🟢 OK ]  [ Meine Qualifikationen ]
 ```
 
-**Ampel_Farbe** – für Slicer und bedingte Formatierung:
+### 6.4 Visual-Ebenen-Filter (Pflicht)
 
-```dax
-Ampel_Farbe =
-VAR Tage = Qualifikations_Status[Tage_bis_Ablauf]
-RETURN
-    IF(
-        ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt]),
-        "⚪ Kein Datum",
-        IF(Tage <= 30,  "🔴 Rot",
-        IF(Tage <= 60,  "🟡 Gelb",
-        IF(Tage <= 90,  "🟠 Orange",
-                        "🟢 Grün")))
-    )
-```
+Für jedes Tabellenvisual im Filterbereich unter **Visual-Ebenen-Filter** eintragen:
 
-> **Wichtig:** `Ampel_Farbe` – **Sortierung nach Spalte** → `Ampel_Sortierung` setzen, damit Rot im Slicer und Visual immer oben erscheint.
+- `Hat_Qualifikation` = 1 – verhindert Phantomzeilen aus der Datum-Tabelle
 
-**Ampel_Sortierung** – Sortierspalte (1 = Rot, 5 = kein Datum):
-
-```dax
-Ampel_Sortierung =
-VAR Tage = Qualifikations_Status[Tage_bis_Ablauf]
-RETURN
-    IF(ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt]), 5,
-    IF(Tage <= 30,  1,
-    IF(Tage <= 60,  2,
-    IF(Tage <= 90,  3,
-                    4))))
-```
-
-**Dringlichkeits_Bucket** – für Slicer mit klar lesbaren Stufen:
-
-```dax
-Dringlichkeits_Bucket =
-VAR Tage = Qualifikations_Status[Tage_bis_Ablauf]
-RETURN
-    IF(ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt]), "Kein Datum",
-    IF(Tage <  0,   "Abgelaufen",
-    IF(Tage <= 30,  "≤ 30 Tage",
-    IF(Tage <= 60,  "31–60 Tage",
-    IF(Tage <= 90,  "61–90 Tage",
-                    "> 90 Tage (OK)")))))
-```
-
-### 4.3 Measures anlegen
-
-**Modellierung → Neues Measure** (Tabelle `Qualifikations_Status` auswählen)
-
-**KPI-Zählmeasures** (jeweils eine Karte pro Ampelfarbe):
-
-```dax
-Anzahl_Rot =
-CALCULATE(
-    COUNTROWS(Qualifikations_Status),
-    NOT ISBLANK(Qualifikations_Status[Tage_bis_Ablauf]),
-    Qualifikations_Status[Tage_bis_Ablauf] <= 30
-)
-
-Anzahl_Gelb    = CALCULATE(COUNTROWS(Qualifikations_Status),
-    Qualifikations_Status[Tage_bis_Ablauf] >= 31,
-    Qualifikations_Status[Tage_bis_Ablauf] <= 60)
-
-Anzahl_Orange  = CALCULATE(COUNTROWS(Qualifikations_Status),
-    Qualifikations_Status[Tage_bis_Ablauf] >= 61,
-    Qualifikations_Status[Tage_bis_Ablauf] <= 90)
-
-Anzahl_Gruen   = CALCULATE(COUNTROWS(Qualifikations_Status),
-    Qualifikations_Status[Tage_bis_Ablauf] > 90)
-```
-
-**Ampel_Farbe_HEX** – Hexfarbcode für bedingte Formatierung per Feldwert:
-
-```dax
-Ampel_Farbe_HEX =
-VAR Tage = [Tage_bis_Ablauf_M]
-RETURN
-    IF(ISBLANK(Tage),  "#808080",
-    IF(Tage <= 30,     "#C00000",
-    IF(Tage <= 60,     "#FFD700",
-    IF(Tage <= 90,     "#FF8C00",
-                       "#00B050"))))
-```
-
-**Datenqualitäts-Measures** (für Seite 3):
-
-```dax
-Anzahl_Datum_Fehlerhaft =
-CALCULATE(
-    COUNTROWS(Qualifikations_Status),
-    Qualifikations_Status[Datum_Fehlerhaft] = TRUE()
-)
-
-Anteil_Fehlerhaft_Prozent =
-VAR Pruefbar = CALCULATE(COUNTROWS(Qualifikations_Status),
-    NOT ISBLANK(Qualifikations_Status[Datum_Fehlerhaft]))
-RETURN
-    DIVIDE([Anzahl_Datum_Fehlerhaft], Pruefbar, 0)
-
-Datenqualitaet_Ampel =
-VAR Anteil = [Anteil_Fehlerhaft_Prozent]
-RETURN
-    IF(Anteil = 0,       "✅ Keine Fehler",
-    IF(Anteil < 0.05,    "🟢 Gut (< 5%)",
-    IF(Anteil < 0.20,    "🟡 Prüfen (5–20%)",
-                         "🔴 Kritisch (> 20%)")))
-```
-
-→ Sämtliche Measures mit vollständiger Dokumentation: `Ampel_Measures_v2.dax` und `Datenqualitaet_Measures.dax`
+Für das Datenqualitäts-Visual zusätzlich:
+- `Datum_Fehlerhaft` = `TRUE` – zeigt nur fehlerhafte Einträge
