@@ -1,0 +1,141 @@
+// ============================================================
+// Datenqualitaet_Measures.dax
+// Kennzahlen zur Identifikation fehlerhafter Datumseinträge
+//
+// Voraussetzung: Spalte Datum_Fehlerhaft (logical) ist in
+// Qualifikations_Status vorhanden (aus Korrekturlogik).
+// Ebenso die Spalten Gültig_ab_Korrekt, Gültig_bis_Korrekt.
+//
+// Verwendung im Dashboard:
+//   • KPI-Karte: Anzahl_Datum_Fehlerhaft (rot wenn > 0)
+//   • KPI-Karte: Anteil_Fehlerhaft_Prozent
+//   • KPI-Karte: Datenqualitaet_Ampel
+//   • Tabellenvisual: Vergleich Ist vs. Soll (Filter: Datum_Fehlerhaft = true)
+// ============================================================
+
+
+// ------------------------------------------------------------
+// 1) Anzahl_Datum_Fehlerhaft
+//    Zählt Zeilen, bei denen Gültig_ab oder Gültig_bis vom
+//    korrekten statusabhängigen Soll-Wert abweicht.
+// ------------------------------------------------------------
+Anzahl_Datum_Fehlerhaft =
+CALCULATE(
+    COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Datum_Fehlerhaft] = TRUE()
+)
+
+
+// ------------------------------------------------------------
+// 2) Anzahl_Datum_Korrekt
+//    Zählt Zeilen, bei denen beide Datumswerte korrekt sind.
+// ------------------------------------------------------------
+Anzahl_Datum_Korrekt =
+CALCULATE(
+    COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Datum_Fehlerhaft] = FALSE()
+)
+
+
+// ------------------------------------------------------------
+// 3) Anzahl_Kein_Erstberufung
+//    Zeilen, bei denen das statusabhängige Erstberufungsdatum
+//    nicht gesetzt ist (Datum_Fehlerhaft = BLANK).
+//    Hinweis: Diese Zeilen sind nicht prüfbar und gehen nicht
+//    in Anteil_Fehlerhaft_Prozent ein.
+// ------------------------------------------------------------
+Anzahl_Kein_Erstberufung =
+CALCULATE(
+    COUNTROWS(Qualifikations_Status),
+    ISBLANK(Qualifikations_Status[Datum_Fehlerhaft])
+)
+
+
+// ------------------------------------------------------------
+// 4) Anteil_Fehlerhaft_Prozent
+//    Anteil fehlerhafter Einträge an allen prüfbaren Einträgen
+//    (Zeilen ohne Erstberufungsdatum werden ausgeschlossen).
+//    Format: Prozent mit 1 Dezimalstelle
+// ------------------------------------------------------------
+Anteil_Fehlerhaft_Prozent =
+VAR Pruefbar =
+    CALCULATE(
+        COUNTROWS(Qualifikations_Status),
+        NOT ISBLANK(Qualifikations_Status[Datum_Fehlerhaft])
+    )
+RETURN
+    DIVIDE([Anzahl_Datum_Fehlerhaft], Pruefbar, 0)
+
+
+// ------------------------------------------------------------
+// 5) Abweichung_Gueltig_ab_Tage
+//    Durchschnittliche Ist-Soll-Differenz in Tagen für Gültig_ab,
+//    nur für fehlerhafte Zeilen.
+// ------------------------------------------------------------
+Abweichung_Gueltig_ab_Tage =
+AVERAGEX(
+    FILTER(
+        Qualifikations_Status,
+        Qualifikations_Status[Datum_Fehlerhaft] = TRUE()
+            && NOT ISBLANK(Qualifikations_Status[Gültig_ab])
+            && NOT ISBLANK(Qualifikations_Status[Gültig_ab_Korrekt])
+    ),
+    ABS(
+        DATEDIFF(
+            Qualifikations_Status[Gültig_ab],
+            Qualifikations_Status[Gültig_ab_Korrekt],
+            DAY
+        )
+    )
+)
+
+
+// ------------------------------------------------------------
+// 6) Abweichung_Gueltig_bis_Tage
+//    Durchschnittliche Ist-Soll-Differenz in Tagen für Gültig_bis.
+// ------------------------------------------------------------
+Abweichung_Gueltig_bis_Tage =
+AVERAGEX(
+    FILTER(
+        Qualifikations_Status,
+        Qualifikations_Status[Datum_Fehlerhaft] = TRUE()
+            && NOT ISBLANK(Qualifikations_Status[Gültig_bis])
+            && NOT ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt])
+    ),
+    ABS(
+        DATEDIFF(
+            Qualifikations_Status[Gültig_bis],
+            Qualifikations_Status[Gültig_bis_Korrekt],
+            DAY
+        )
+    )
+)
+
+
+// ------------------------------------------------------------
+// 7) Hat_Datumsfehler_Auditor
+//    Gibt 1 zurück, wenn der aktuell gefilterte Auditor
+//    mindestens einen fehlerhaften Datumseintrag hat.
+//    Verwendung: Bedingte Formatierung in der Auditoren-
+//    Übersichtstabelle (Zelle rot hinterlegen).
+// ------------------------------------------------------------
+Hat_Datumsfehler_Auditor =
+IF([Anzahl_Datum_Fehlerhaft] > 0, 1, BLANK())
+
+
+// ------------------------------------------------------------
+// 8) Datenqualitaet_Ampel
+//    Gesamtbewertung der Datenqualität als Textkennzahl.
+//    Schwellenwerte:
+//      Keine Fehler       → Ok
+//      Fehleranteil < 5%  → Gut
+//      Fehleranteil 5-20% → Prüfen erforderlich
+//      Fehleranteil > 20% → Kritisch
+// ------------------------------------------------------------
+Datenqualitaet_Ampel =
+VAR Anteil = [Anteil_Fehlerhaft_Prozent]
+RETURN
+    IF(Anteil = 0,         "✅ Keine Fehler",
+    IF(Anteil < 0.05,      "🟢 Gut (< 5%)",
+    IF(Anteil < 0.20,      "🟡 Prüfen (5–20%)",
+                           "🔴 Kritisch (> 20%)")))

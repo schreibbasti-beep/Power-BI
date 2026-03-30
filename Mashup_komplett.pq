@@ -98,8 +98,8 @@ shared Qualifikations_Status = let
         {"Quali_SP_ID",                      Int64.Type},
         {"Approval_SP_ID",                   Int64.Type},
         {"Status",                           type text},
-        {"Gültig_ab",                        type date},
-        {"Gültig_bis",                       type date},
+        {"G\u00fcltig_ab",                        type date},
+        {"G\u00fcltig_bis",                       type date},
         {"Datum_Erstberufung_Assistant_Tra", type date},
         {"Datum_Erstberufung_Co_Auditor",    type date},
         {"Datum_Erstberufung_Lead_Auditor",  type date},
@@ -116,7 +116,7 @@ shared Qualifikations_Status = let
     ),
     // "Id" (Tippfehler) und "ID" waren beide vorhanden → nur "ID" behalten.
     #"Neu angeordnete Spalten" = Table.ReorderColumns(GefilterteZeilen, {
-        "ID", "Quali_SP_ID", "Auditor_SP_ID", "Gültig_ab", "Gültig_bis",
+        "ID", "Quali_SP_ID", "Auditor_SP_ID", "G\u00fcltig_ab", "G\u00fcltig_bis",
         "quali_log", "Approval_SP_ID", "Status",
         "Datum_Erstberufung_Assistant_Tra", "Datum_Erstberufung_Co_Auditor",
         "Datum_Erstberufung_Lead_Auditor"
@@ -150,8 +150,8 @@ shared approval_log = let
         {"Auditor_LookupId",           "Auditor_SP_ID"},
         {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},
-        {"formaleReberufung",          "gültig_von"},
-        {"GültigkeitderformalenReber", "gültig_bis"},
+        {"formaleReberufung",          "g\u00fcltig_von"},
+        {"G\u00fcltigkeitderformalenReber", "g\u00fcltig_bis"},
         {"Created",                    "Erstellt"}
     }),
     Typen = Table.TransformColumnTypes(Umbenannt, {
@@ -159,8 +159,8 @@ shared approval_log = let
         {"Auditor_SP_ID",      Int64.Type},
         {"Quali_SP_ID",        Int64.Type},
         {"Datum_CL",           type date},
-        {"gültig_von",         type date},
-        {"gültig_bis",         type date},
+        {"g\u00fcltig_von",         type date},
+        {"g\u00fcltig_bis",         type date},
         {"Erstellt",           type datetime},
         {"abweichendeDauer",   type number},
         {"Art",                type text},
@@ -189,8 +189,11 @@ in
 //   2. Beziehung erstellen:
 //      Datum[Datum]  →  Qualifikations_Status[Gültig_bis]
 //      (1:n, Einzelrichtung: Datum → Qualifikations_Status)
-//   3. Im Visual: Datum[Jahr], Datum[Monat_Name], Datum[Tag]
-//      statt der alten Gültig_bis-Hierarchie verwenden.
+//   3. Im Visual folgende Spalten verwenden (statt alter Gültig_bis-Hierarchie):
+//        Jahr | Halbjahr | Quartal | KW | Monat_Name | Jahresmonat | Tag
+//      Wichtig – "Sortierung nach Spalte" setzen:
+//        Monat_Name  → Monat_Nr
+//        Wochentag   → Wochentag_Nr
 // ============================================================
 shared Datum = let
     StartDatum  = #date(2015, 1, 1),
@@ -202,11 +205,17 @@ shared Datum = let
         Splitter.SplitByNothing(),
         type table [Datum = date]
     ),
-    MitJahr      = Table.AddColumn(Tabelle,     "Jahr",       each Date.Year([Datum]),                       Int64.Type),
-    MitQuartal   = Table.AddColumn(MitJahr,     "Quartal",    each "Q" & Text.From(Date.QuarterOfYear([Datum])), type text),
-    MitMonatNr   = Table.AddColumn(MitQuartal,  "Monat_Nr",   each Date.Month([Datum]),                      Int64.Type),
-    MitMonatName = Table.AddColumn(MitMonatNr,  "Monat_Name", each Date.ToText([Datum], "MMMM", "de-DE"),    type text),
-    MitTag       = Table.AddColumn(MitMonatName,"Tag",        each Date.Day([Datum]),                        Int64.Type),
-    MitWochentag = Table.AddColumn(MitTag,      "Wochentag",  each Date.ToText([Datum], "dddd", "de-DE"),    type text)
+    MitJahr        = Table.AddColumn(Tabelle,        "Jahr",         each Date.Year([Datum]),                                                                    Int64.Type),
+    MitHalbjahr    = Table.AddColumn(MitJahr,        "Halbjahr",     each if Date.Month([Datum]) <= 6 then "H1" else "H2",                                        type text),
+    MitQuartal     = Table.AddColumn(MitHalbjahr,    "Quartal",      each "Q" & Text.From(Date.QuarterOfYear([Datum])),                                           type text),
+    MitKW          = Table.AddColumn(MitQuartal,     "KW",           each Date.WeekOfYear([Datum], Day.Monday),                                                   Int64.Type),
+    MitMonatNr     = Table.AddColumn(MitKW,          "Monat_Nr",     each Date.Month([Datum]),                                                                    Int64.Type),
+    MitMonatName   = Table.AddColumn(MitMonatNr,     "Monat_Name",   each Date.ToText([Datum], "MMMM", "de-DE"),                                                  type text),
+    MitJahresmonat = Table.AddColumn(MitMonatName,   "Jahresmonat",  each Text.From(Date.Year([Datum])) & "-" & Text.PadStart(Text.From(Date.Month([Datum])), 2, "0"), type text),
+    MitTag         = Table.AddColumn(MitJahresmonat, "Tag",          each Date.Day([Datum]),                                                                      Int64.Type),
+    MitWochentag   = Table.AddColumn(MitTag,         "Wochentag",    each Date.ToText([Datum], "dddd", "de-DE"),                                                  type text),
+    // Wochentag_Nr: 1 = Montag … 7 = Sonntag
+    // "Sortierung nach Spalte" für Wochentag → Wochentag_Nr setzen!
+    MitWochentagNr = Table.AddColumn(MitWochentag,   "Wochentag_Nr", each Date.DayOfWeek([Datum], Day.Monday) + 1,                                                Int64.Type)
 in
-    MitWochentag;
+    MitWochentagNr;
