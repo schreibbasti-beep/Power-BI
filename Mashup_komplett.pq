@@ -150,8 +150,8 @@ shared approval_log = let
         {"Auditor_LookupId",           "Auditor_SP_ID"},
         {"Qualifikation_LookupId",     "Quali_SP_ID"},
         {"Datum",                      "Datum_CL"},
-        {"formaleReberufung",          "g\u00fcltig_von"},
-        {"G\u00fcltigkeitderformalenReber", "g\u00fcltig_bis"},
+        {"formaleReberufung",          "gültig_von"},
+        {"GültigkeitderformalenReber", "gültig_bis"},
         {"Created",                    "Erstellt"}
     }),
     Typen = Table.TransformColumnTypes(Umbenannt, {
@@ -159,8 +159,8 @@ shared approval_log = let
         {"Auditor_SP_ID",      Int64.Type},
         {"Quali_SP_ID",        Int64.Type},
         {"Datum_CL",           type date},
-        {"g\u00fcltig_von",         type date},
-        {"g\u00fcltig_bis",         type date},
+        {"gültig_von",         type date},
+        {"gültig_bis",         type date},
         {"Erstellt",           type datetime},
         {"abweichendeDauer",   type number},
         {"Art",                type text},
