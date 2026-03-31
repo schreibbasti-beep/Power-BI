@@ -2,10 +2,10 @@
 // Ampel_Measures_v2.dax
 // 4-Farben-Ampelsystem – Auditor-Qualifikationen
 //
-// Rot    = abgelaufen oder ≤ 30 Tage  (Tage_bis_Ablauf ≤ 30)
-// Gelb   = 31–60 Tage
-// Orange = 61–90 Tage
-// Grün   = mehr als 90 Tage
+// Rot    = abgelaufen (Tage_bis_Ablauf < 0)
+// Orange = 0–90 Tage
+// Gelb   = 91–180 Tage
+// Grün   = mehr als 180 Tage
 // Grau   = kein Gültig_bis_Korrekt gesetzt
 //
 // Voraussetzung: Qualifikations_Status_Korrektur.pq ist als
@@ -41,9 +41,9 @@
 //     IF(
 //         ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt]),
 //         "⚪ Kein Datum",
-//         IF(Tage <= 30,  "🔴 Rot",
-//         IF(Tage <= 60,  "🟡 Gelb",
+//         IF(Tage < 0,    "🔴 Rot",
 //         IF(Tage <= 90,  "🟠 Orange",
+//         IF(Tage <= 180, "🟡 Gelb",
 //                         "🟢 Grün")))
 //     )
 
@@ -55,9 +55,9 @@
 // VAR Tage = Qualifikations_Status[Tage_bis_Ablauf]
 // RETURN
 //     IF(ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt]), 5,
-//     IF(Tage <= 30,  1,
-//     IF(Tage <= 60,  2,
-//     IF(Tage <= 90,  3,
+//     IF(Tage < 0,    1,
+//     IF(Tage <= 90,  2,
+//     IF(Tage <= 180, 3,
 //                     4))))
 
 
@@ -67,11 +67,10 @@
 // VAR Tage = Qualifikations_Status[Tage_bis_Ablauf]
 // RETURN
 //     IF(ISBLANK(Qualifikations_Status[Gültig_bis_Korrekt]), "Kein Datum",
-//     IF(Tage <  0,   "Abgelaufen",
-//     IF(Tage <= 30,  "≤ 30 Tage",
-//     IF(Tage <= 60,  "31–60 Tage",
-//     IF(Tage <= 90,  "61–90 Tage",
-//                     "> 90 Tage (OK)")))))
+//     IF(Tage <  0,    "Abgelaufen",
+//     IF(Tage <= 90,   "0–90 Tage",
+//     IF(Tage <= 180,  "91–180 Tage",
+//                      "> 180 Tage (OK)"))))
 
 
 // ------------------------------------------------------------
@@ -103,24 +102,24 @@ Ampel_Status_M =
 VAR Tage = [Tage_bis_Ablauf_M]
 RETURN
     IF(ISBLANK(Tage),  "Kein Datum",
-    IF(Tage <= 30,     "Rot",
-    IF(Tage <= 60,     "Gelb",
+    IF(Tage < 0,       "Rot",
     IF(Tage <= 90,     "Orange",
+    IF(Tage <= 180,    "Gelb",
                        "Grün"))))
 
 
 // ------------------------------------------------------------
 // 3) Ampel_Symbol_M
 //    Unicode-Kreise für kompakte Anzeige in Tabelle/Matrix.
-//    🔴 Rot | 🟡 Gelb | 🟠 Orange | 🟢 Grün | ⚪ Kein Datum
+//    🔴 Rot | 🟠 Orange | 🟡 Gelb | 🟢 Grün | ⚪ Kein Datum
 // ------------------------------------------------------------
 Ampel_Symbol_M =
 VAR Tage = [Tage_bis_Ablauf_M]
 RETURN
     IF(ISBLANK(Tage),  "⚪",
-    IF(Tage <= 30,     "🔴",
-    IF(Tage <= 60,     "🟡",
+    IF(Tage < 0,       "🔴",
     IF(Tage <= 90,     "🟠",
+    IF(Tage <= 180,    "🟡",
                        "🟢"))))
 
 
@@ -133,11 +132,11 @@ RETURN
 Ampel_Farbe_HEX =
 VAR Tage = [Tage_bis_Ablauf_M]
 RETURN
-    IF(ISBLANK(Tage),  "#808080",   // Grau   – kein Datum
-    IF(Tage <= 30,     "#C00000",   // Dunkelrot
-    IF(Tage <= 60,     "#FFD700",   // Gelb
-    IF(Tage <= 90,     "#FF8C00",   // Orange
-                       "#00B050")))) // Grün
+    IF(ISBLANK(Tage),  "#808080",   // Grau      – kein Datum
+    IF(Tage < 0,       "#C00000",   // Dunkelrot – abgelaufen
+    IF(Tage <= 90,     "#FF8C00",   // Orange    – 0–90 Tage
+    IF(Tage <= 180,    "#FFD700",   // Gelb      – 91–180 Tage
+                       "#00B050")))) // Grün      – > 180 Tage
 
 
 // ------------------------------------------------------------
@@ -149,27 +148,27 @@ Anzahl_Rot =
 CALCULATE(
     COUNTROWS(Qualifikations_Status),
     NOT ISBLANK(Qualifikations_Status[Tage_bis_Ablauf]),
-    Qualifikations_Status[Tage_bis_Ablauf] <= 30
-)
-
-Anzahl_Gelb =
-CALCULATE(
-    COUNTROWS(Qualifikations_Status),
-    Qualifikations_Status[Tage_bis_Ablauf] >= 31,
-    Qualifikations_Status[Tage_bis_Ablauf] <= 60
+    Qualifikations_Status[Tage_bis_Ablauf] < 0
 )
 
 Anzahl_Orange =
 CALCULATE(
     COUNTROWS(Qualifikations_Status),
-    Qualifikations_Status[Tage_bis_Ablauf] >= 61,
+    Qualifikations_Status[Tage_bis_Ablauf] >= 0,
     Qualifikations_Status[Tage_bis_Ablauf] <= 90
+)
+
+Anzahl_Gelb =
+CALCULATE(
+    COUNTROWS(Qualifikations_Status),
+    Qualifikations_Status[Tage_bis_Ablauf] >= 91,
+    Qualifikations_Status[Tage_bis_Ablauf] <= 180
 )
 
 Anzahl_Gruen =
 CALCULATE(
     COUNTROWS(Qualifikations_Status),
-    Qualifikations_Status[Tage_bis_Ablauf] > 90
+    Qualifikations_Status[Tage_bis_Ablauf] > 180
 )
 
 Anzahl_Gesamt =
@@ -184,7 +183,7 @@ CALCULATE(
 
 // ------------------------------------------------------------
 // 6) Anteil_Kritisch_Prozent
-//    Anteil der Rot-Einträge am Gesamtbestand.
+//    Anteil abgelaufener Qualifikationen (Rot) am Gesamtbestand.
 //    Format als Prozent mit 1 Dezimalstelle.
 // ------------------------------------------------------------
 Anteil_Kritisch_Prozent =
