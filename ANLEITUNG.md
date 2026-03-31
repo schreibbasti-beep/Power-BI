@@ -1,7 +1,7 @@
 # Power BI Dashboard – Auditor-Qualifikationen
 ## Vollständige Schritt-für-Schritt-Aufbauanleitung
 
-**Version:** 1.1 · **Stand:** März 2026  
+**Version:** 1.2 · **Stand:** März 2026  
 **Umgebung:** Power BI Service (Pro-Lizenz) · SharePoint Online  
 **Datenquelle:** `https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation`
 
@@ -88,7 +88,43 @@ Nach Schritt 3: `Qualifikations_Status_Korrektur` als Faktentabelle einsetzen un
 
 ## Schritt 3 – Korrekturlogik (Power Query M)
 
-Statusabhängige Erstberufungsdaten + rollierender Zyklus via `Berufung_Monate` aus `Qualifikations_Regelwerk`. Neue Spalten: `Erstberufung_Korrekt`, `Berufung_Monate`, `Gültig_ab_Korrekt`, `Gültig_bis_Korrekt`, `Datum_Fehlerhaft`.
+Die Korrekturlogik ergänzt `Qualifikations_Status` um fünf neue Spalten:
+`Erstberufung_Korrekt`, `Berufung_Monate`, `Gültig_ab_Korrekt`, `Gültig_bis_Korrekt`, `Datum_Fehlerhaft`.
+
+> **Wichtig:** Die DAX-Formeln in `Ampel_Measures_v2.dax` referenzieren diese Spalten direkt in der Tabelle `Qualifikations_Status`. Die Korrektur muss deshalb **in diese Tabelle integriert** werden – nicht als separate Tabelle geladen werden. Zwei Optionen:
+
+### Option A – Direkte Integration in `Qualifikations_Status` (empfohlen)
+
+Diese Option erweitert die bestehende Abfrage, sodass alle Beziehungen und DAX-Formeln unverändert funktionieren.
+
+1. Power BI Desktop → **Start → Daten transformieren** (Power Query Editor öffnen)
+2. Im linken Panel `Qualifikations_Status` auswählen
+3. **Start → Erweiterter Editor** öffnen
+4. Den letzten Schritt der Abfrage notieren (z. B. `UmbenennteSpalten` oder `GeänderterTyp`)
+5. Datei `Qualifikations_Status_Korrektur.pq` öffnen
+6. **Alle Schritte ab `MitRegelwerk` bis `FinaleSpalten`** kopieren und ans Ende der bestehenden Abfrage einfügen
+7. Im kopierten ersten Schritt `Basis = Qualifikations_Status` durch den notierten letzten Schritt ersetzen, z. B.:
+   ```m
+   Basis = UmbenennteSpalten,
+   ```
+8. Den `in`-Ausdruck am Ende auf `FinaleSpalten` ändern:
+   ```m
+   in
+       FinaleSpalten
+   ```
+9. **Schließen & Anwenden** – die fünf neuen Spalten erscheinen jetzt in `Qualifikations_Status`
+
+### Option B – Als eigenständige Abfrage (falls Option A nicht möglich)
+
+Diese Option behält beide Abfragen, erfordert aber das Umstellen aller Beziehungen.
+
+1. Power Query Editor → **Neue Quelle → Leere Abfrage**
+2. **Erweiterter Editor** öffnen, Inhalt von `Qualifikations_Status_Korrektur.pq` einfügen
+3. Abfrage umbenennen: `Qualifikations_Status_Korrektur`
+4. Originale `Qualifikations_Status`-Abfrage rechtsklicken → **„Laden aktivieren" deaktivieren** (Tabelle bleibt als Staging-Quelle erhalten, wird aber nicht ins Modell geladen)
+5. **Schließen & Anwenden**
+6. Im Datenmodell (Modellierungsansicht) alle vier Beziehungen auf `Qualifikations_Status_Korrektur` umstellen
+7. In allen DAX-Formeln `Qualifikations_Status` durch `Qualifikations_Status_Korrektur` ersetzen
 
 → `Qualifikations_Status_Korrektur.pq`
 
