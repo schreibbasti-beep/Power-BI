@@ -100,7 +100,8 @@ shared Qualifikations_Status_Korrektur = let
                         heute      = Date.From(DateTime.LocalNow()),
                         diffMonate = (Date.Year(heute) - Date.Year(eb)) * 12
                                    + (Date.Month(heute) - Date.Month(eb)),
-                        diffPos    = Number.Max(0, diffMonate),
+                        // Number.Max ist im Service nicht verfügbar → if-then-else
+                        diffPos    = if diffMonate > 0 then diffMonate else 0,
                         zyklen     = Number.IntegerDivide(diffPos, monate),
                         kandidat   = Date.AddMonths(eb, zyklen * monate),
                         // Taggenau: Kandidat noch in der Zukunft? Einen Zyklus zurück.
