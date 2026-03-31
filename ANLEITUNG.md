@@ -1,7 +1,7 @@
 # Power BI Dashboard – Auditor-Qualifikationen
 ## Vollständige Schritt-für-Schritt-Aufbauanleitung
 
-**Version:** 1.0 · **Stand:** März 2026  
+**Version:** 1.1 · **Stand:** März 2026  
 **Umgebung:** Power BI Service (Pro-Lizenz) · SharePoint Online  
 **Datenquelle:** `https://dekracloud.sharepoint.com/sites/TeamCyber_Innovation`
 
@@ -34,7 +34,7 @@ Das Dashboard zeigt auf einen Blick, welche Auditor-Qualifikationen ablaufen ode
 | **Auditoren** | Eigenübersicht eigener Ablauffristen | Seite 2 – Eigenansicht |
 | **Auditmanager / Teamleitung** | Teamübersicht, Handlungsbedarf erkennen | Seite 1 – Gesamtübersicht |
 | **QM / Compliance** | Vollständigkeit, Regelkonformität, Datenqualität prüfen | Seite 3 – Datenqualität |
-| **Geschäftsführung** | Aggregierte Risikoübersicht, KPIs | Seite 1 (gefiltert nach Land/Region) |
+| **Geschäftsführung** | Aggregierte Risikouübersicht, KPIs | Seite 1 (gefiltert nach Land/Region) |
 
 > Ohne RLS sind alle Seiten durch manuelle Slicer-Auswahl bedienbar. Siehe [Schritt 8](#schritt-8--row-level-security-hinweis).
 
@@ -42,13 +42,13 @@ Das Dashboard zeigt auf einen Blick, welche Auditor-Qualifikationen ablaufen ode
 
 | Farbe | Tage bis Ablauf |
 |---|---|
-| 🔴 **Rot** | ≤ 30 (inkl. abgelaufen) |
-| 🟡 **Gelb** | 31 – 60 |
-| 🟠 **Orange** | 61 – 90 |
-| 🟢 **Grün** | > 90 |
+| 🔴 **Rot** | < 0 (abgelaufen) |
+| 🟠 **Orange** | 0 – 90 |
+| 🟡 **Gelb** | 91 – 180 |
+| 🟢 **Grün** | > 180 |
 | ⚪ **Grau** | kein Datum |
 
-### 1.3 Dateienübersicht
+### 1.3 Dateiübersicht
 
 | Datei | Inhalt |
 |---|---|
@@ -96,7 +96,18 @@ Statusabhängige Erstberufungsdaten + rollierender Zyklus via `Berufung_Monate` 
 
 ## Schritt 4 – DAX-Formeln
 
-Berechnete Spalten: `Tage_bis_Ablauf`, `Ampel_Farbe` (nach `Ampel_Sortierung` sortieren), `Dringlichkeits_Bucket`. Measures: `Anzahl_Rot/Gelb/Orange/Gruen`, `Ampel_Farbe_HEX`, `Anzahl_Datum_Fehlerhaft`, `Anteil_Fehlerhaft_Prozent`, `Datenqualitaet_Ampel`.
+Berechnete Spalten: `Tage_bis_Ablauf`, `Ampel_Farbe` (nach `Ampel_Sortierung` sortieren), `Dringlichkeits_Bucket`.
+
+Ampellogik der berechneten Spalten:
+
+| Bedingung | Farbe | Bucket |
+|---|---|---|
+| `Tage_bis_Ablauf < 0` | 🔴 Rot | Abgelaufen |
+| `0 ≤ Tage_bis_Ablauf ≤ 90` | 🟠 Orange | 0–90 Tage |
+| `91 ≤ Tage_bis_Ablauf ≤ 180` | 🟡 Gelb | 91–180 Tage |
+| `Tage_bis_Ablauf > 180` | 🟢 Grün | > 180 Tage (OK) |
+
+Measures: `Anzahl_Rot`, `Anzahl_Orange`, `Anzahl_Gelb`, `Anzahl_Gruen`, `Ampel_Farbe_HEX`, `Anzahl_Datum_Fehlerhaft`, `Anteil_Fehlerhaft_Prozent`, `Datenqualitaet_Ampel`.
 
 → `Ampel_Measures_v2.dax` | `Datenqualitaet_Measures.dax`
 
@@ -104,7 +115,7 @@ Berechnete Spalten: `Tage_bis_Ablauf`, `Ampel_Farbe` (nach `Ampel_Sortierung` so
 
 ## Schritt 5 – Dashboard-Visualisierung
 
-**Seite 1:** 4 KPI-Karten (Rot/Gelb/Orange/Grün) + Haupttabelle mit bedingter Formatierung per `Ampel_Farbe_HEX` + Balkendiagramm nach Dringlichkeit. Visual-Filter `Hat_Qualifikation = 1` gegen Phantomzeilen.
+**Seite 1:** 4 KPI-Karten (🔴 Rot / 🟠 Orange / 🟡 Gelb / 🟢 Grün) + Haupttabelle mit bedingter Formatierung per `Ampel_Farbe_HEX` + Balkendiagramm nach Dringlichkeit. Visual-Filter `Hat_Qualifikation = 1` gegen Phantomzeilen.
 
 **Seite 2:** Wie Seite 1 + Auditor-Slicer vorausgefüllt + Zeitlinie + Karte „nächste Fälligkeit“.
 
@@ -250,7 +261,8 @@ Nach dem Publish:
 
 | Handlung | Wo |
 |---|---|
-| Kritische Fälle identifizieren | KPI-Karte `Anzahl_Rot` + Tabellenvisual gefiltert auf „≤ 30 Tage“ |
+| Kritische Fälle identifizieren | KPI-Karte `Anzahl_Rot` (abgelaufene Qualifikationen) + Tabellenvisual gefiltert auf `Tage_bis_Ablauf < 0` |
+| Dringliche Fälle (0–90 Tage) überblicken | KPI-Karte `Anzahl_Orange` + Dringlichkeits_Bucket-Slicer |
 | Einzelne Auditoren prüfen | Nachname-Slicer auf Seite 1 |
 | Team-Risikoprofil | Balkendiagramm nach Dringlichkeit (alle Auditoren) |
 | Teamliste exportieren | Tabellenvisual → `…` → Daten exportieren |
@@ -273,9 +285,9 @@ Nach dem Publish:
 
 | Handlung | Wo |
 |---|---|
-| Risiko-KPIs auf einen Blick | KPI-Leiste oben (Rot/Gelb/Orange/Grün) |
+| Risiko-KPIs auf einen Blick | KPI-Leiste oben (🔴 Rot / 🟠 Orange / 🟡 Gelb / 🟢 Grün) |
 | Regionale Analyse | Land-Slicer → Balkendiagramm aktualisiert sich automatisch |
-| Anteil kritischer Fälle | Measure `Anteil_Kritisch_Prozent` als zusätzliche Karte |
+| Anteil abgelaufener Qualifikationen | Measure `Anteil_Kritisch_Prozent` als zusätzliche Karte |
 | Datenqualität überwachen | Measure `Datenqualitaet_Ampel` als Karte auf Seite 1 einbinden |
 
 ---
