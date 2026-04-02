@@ -151,11 +151,168 @@ Measures: `Anzahl_Rot`, `Anzahl_Orange`, `Anzahl_Gelb`, `Anzahl_Gruen`, `Ampel_F
 
 ## Schritt 5 – Dashboard-Visualisierung
 
-**Seite 1:** 4 KPI-Karten (🔴 Rot / 🟠 Orange / 🟡 Gelb / 🟢 Grün) + Haupttabelle mit bedingter Formatierung per `Ampel_Farbe_HEX` + Balkendiagramm nach Dringlichkeit. Visual-Filter `Hat_Qualifikation = 1` gegen Phantomzeilen.
+> Alle Schritte gelten für **Power BI Desktop** (empfohlen für den Aufbau) und für **Power BI Service** im Bearbeitungsmodus (Bericht → Bearbeiten). Die Oberfläche ist identisch.
 
-**Seite 2:** Wie Seite 1 + Auditor-Slicer vorausgefüllt + Zeitlinie + Karte „nächste Fälligkeit“.
+---
 
-**Seite 3:** Fehler-KPIs + Ist-Soll-Vergleichstabelle (Filter: `Datum_Fehlerhaft = TRUE`, Ist-Spalten rot hinterlegt, CSV-Export).
+### 5.1 Seite 1 – Gesamtübersicht
+
+#### Seite anlegen
+
+1. Unten im Seitenbereich auf **+** klicken → neue Seite erscheint
+2. Doppelklick auf den Seitentab → umbenennen: `Gesamtübersicht`
+
+#### KPI-Karten (4 Stück)
+
+Für jede der vier Farben eine Karte anlegen:
+
+1. **Visualisierungen** (rechtes Panel) → **Karte** (Card-Icon) anklicken
+2. Aus dem Feldbereich das jeweilige Measure in **Felder** ziehen:
+   - Karte 1: `Anzahl_Rot`
+   - Karte 2: `Anzahl_Orange`
+   - Karte 3: `Anzahl_Gelb`
+   - Karte 4: `Anzahl_Gruen`
+3. Karte formatieren (Pinsel-Icon → **Kategoriebeschriftung**):
+   - Karte 1: Beschriftung `Abgelaufen 🔴`, Schriftfarbe `#C00000`
+   - Karte 2: Beschriftung `0–90 Tage 🟠`, Schriftfarbe `#FF8C00`
+   - Karte 3: Beschriftung `91–180 Tage 🟡`, Schriftfarbe `#FFD700`
+   - Karte 4: Beschriftung `> 180 Tage 🟢`, Schriftfarbe `#00B050`
+4. Karten nebeneinander in einer Reihe oben auf der Seite anordnen
+
+#### Haupttabelle mit Ampel-Formatierung
+
+1. **Visualisierungen** → **Tabelle** anklicken
+2. Folgende Felder in **Spalten** ziehen (Reihenfolge anpassen per Drag & Drop):
+   - `Ampel_Symbol_M` (Measure)
+   - `Nachname` (aus `Auditoren_Stammdaten`)
+   - `Vorname`
+   - `Status`
+   - `Gültig_bis_Korrekt`
+   - `Tage_bis_Ablauf_M` (Measure)
+   - `Qualifikationstyp` (aus `Qualifikations_Regelwerk`)
+3. Tabelle nach `Tage_bis_Ablauf_M` aufsteigend sortieren (Spaltenheader klicken)
+
+**Bedingte Formatierung der Zeilen per Ampelfarbe:**
+
+4. Tabelle markiert lassen → **Format** (Pinsel) → **Bedingte Formatierung** aufklappen
+5. Spalte `Ampel_Symbol_M` auswählen → **Hintergrundfarbe** → Schalter einschalten
+6. Formatierungsart: **Feldwert**
+7. Feld: `Ampel_Farbe_HEX` (Measure aus `Ampel_Measures_v2.dax`)
+8. OK → die Zellen färben sich automatisch nach Ampelstatus
+
+> **Tipp:** Denselben Schritt für die Spalte `Tage_bis_Ablauf_M` wiederholen, damit auch diese Zelle eingefärbt wird.
+
+**Visual-Ebenen-Filter gegen Phantomzeilen:**
+
+9. Tabelle markiert → **Filter** (Trichter-Icon rechts) → **Filter für dieses Visual** aufklappen
+10. Measure `Hat_Qualifikation` in den Filterbereich ziehen
+11. Filtertyp: **Basis** → Wert `1` auswählen → **Filter anwenden**
+
+#### Balkendiagramm nach Dringlichkeit
+
+1. **Visualisierungen** → **Gestapeltes Balkendiagramm**
+2. **Y-Achse**: `Dringlichkeits_Bucket` (berechnete Spalte aus `Qualifikations_Status`)
+3. **X-Achse**: `Anzahl_Gesamt` (Measure) — oder `COUNTROWS` auf `Qualifikations_Status`
+4. **Legende**: leer lassen
+5. **Farben**: Format → Datenfarben → Bedingte Formatierung → Feldwert → `Ampel_Farbe_HEX`
+6. Sortierung: nach `Ampel_Sortierung` (berechnete Spalte) → aufsteigend, damit Rot oben steht
+
+---
+
+### 5.2 Seite 2 – Eigenansicht (Auditoren)
+
+#### Seite anlegen & Inhalte kopieren
+
+1. Rechtsklick auf den Tab `Gesamtübersicht` → **Seite duplizieren**
+2. Neuen Tab umbenennen: `Eigenansicht`
+3. KPI-Karten und Tabelle bleiben erhalten
+
+#### Auditor-Slicer hinzufügen
+
+1. **Visualisierungen** → **Datenschnitt** (Slicer-Icon)
+2. Feld: `Nachname` aus `Auditoren_Stammdaten`
+3. Format → **Slicer-Einstellungen** → Stil: **Dropdown**
+4. Slicer oben links platzieren
+
+#### Zeitlinie hinzufügen
+
+1. **Visualisierungen** → **Liniendiagramm**
+2. **X-Achse**: `Datum[Datum]` (aus der Datumsdimension)
+3. **Y-Achse**: `Anzahl_Rot` und `Anzahl_Orange` (beide Measures gleichzeitig)
+4. Diagramm unterhalb der Tabelle platzieren
+5. Titel: `Ablauf-Zeitverlauf`
+
+#### Karte „Nächste Fälligkeit”
+
+1. **Visualisierungen** → **Karte**
+2. Measure: `Frühestes_Ablaufdatum`
+3. Format → Datenbezeichnung → Datumsformat: `TT.MM.JJJJ`
+4. Kategoriebeschriftung: `Nächste Fälligkeit`
+5. Karte oben rechts neben den KPI-Karten platzieren
+
+---
+
+### 5.3 Seite 3 – Datenqualität
+
+#### Seite anlegen
+
+1. **+** → neue Seite → umbenennen: `Datenqualität`
+
+#### Fehler-KPI-Karten (3 Stück)
+
+| Karte | Measure | Beschriftung |
+|---|---|---|
+| 1 | `Anzahl_Datum_Fehlerhaft` | `Fehlerhafte Datensätze` |
+| 2 | `Anteil_Fehlerhaft_Prozent` | `Fehleranteil` (Format: %) |
+| 3 | `Datenqualitaet_Ampel` | `Gesamtbewertung` |
+
+Alle drei nebeneinander oben platzieren.
+
+#### Ist-Soll-Vergleichstabelle
+
+1. **Visualisierungen** → **Tabelle**
+2. Felder in **Spalten** ziehen:
+   - `Nachname`, `Vorname` (aus `Auditoren_Stammdaten`)
+   - `Status`
+   - `Gültig_ab` (Ist)
+   - `Gültig_ab_Korrekt` (Soll)
+   - `Gültig_bis` (Ist)
+   - `Gültig_bis_Korrekt` (Soll)
+   - `Datum_Fehlerhaft`
+
+**Filter auf fehlerhafte Zeilen:**
+
+3. Tabelle markiert → **Filter** → **Filter für dieses Visual**
+4. Spalte `Datum_Fehlerhaft` in den Filterbereich ziehen
+5. Filtertyp: **Basis** → `True` auswählen → **Filter anwenden**
+6. Jetzt werden nur Zeilen angezeigt, bei denen Ist ≠ Soll
+
+**Rote Hintergrundfarbe für Ist-Spalten:**
+
+7. Tabelle markiert → **Format** → **Bedingte Formatierung**
+8. Spalte `Gültig_ab` → **Hintergrundfarbe** → einschalten
+9. Formatierungsart: **Regeln**
+   - Regel: Wenn `Datum_Fehlerhaft` ist `True` → Farbe `#FFB3B3` (helles Rot)
+10. Schritt 8–9 für `Gültig_bis` wiederholen
+
+**CSV-Export aktivieren:**
+
+11. Tabelle markiert → **Format** → **Kopfzeile des Visuals** → **Weitere Optionen (…)** → sicherstellen, dass **Daten exportieren** aktiviert ist
+12. Im veröffentlichten Bericht: Tabelle → `…` → **Daten exportieren** → CSV
+
+---
+
+### 5.4 Abschließende Einstellungen (alle Seiten)
+
+**Seitenreihenfolge** anpassen:
+- Tabs per Drag & Drop in Reihenfolge bringen: `Gesamtübersicht` → `Eigenansicht` → `Datenqualität`
+
+**Standardseite festlegen:**
+- Für Auditoren: Lesezeichen auf `Eigenansicht` setzen und als Startseite konfigurieren
+
+**Bericht veröffentlichen:**
+- Desktop: **Datei → Veröffentlichen → Arbeitsbereich auswählen**
+- Service: Änderungen werden automatisch gespeichert (Speichern-Schaltfläche oben)
 
 ---
 
